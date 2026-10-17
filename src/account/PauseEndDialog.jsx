@@ -5,16 +5,19 @@ import { REASONS } from './common';
 
 const COPY = {
   pause: {
-    title: 'Pause this dynamic',
+    title: 'Pause this dynamic?',
+    statement: 'This is not a substitute for a discussion.',
     intro:
-      'Nothing is lost - everything is kept as it is until it is resumed. They will see that you paused it.',
-    action: 'Pause',
+      'Pausing stops everything where it is. Nothing is lost - it is all kept as it is until it is resumed. Your partner will see that you paused it.',
+    action: 'Yes',
+    cancel: 'Cancel',
   },
   end: {
     title: 'End this dynamic',
     intro:
       'You can leave at any time and nobody has to agree. After this they will no longer see when you are active.',
     action: 'End it',
+    cancel: 'Never mind',
   },
 };
 
@@ -45,21 +48,32 @@ export default function PauseEndDialog({ mode, open, onClose, onSubmit }) {
       title={copy.title}
       onCancel={onClose}
       destroyOnHidden
-      footer={[
-        <Button key='cancel' onClick={onClose}>
-          Never mind
-        </Button>,
-        <Button
-          key='go'
-          type='primary'
-          danger={mode === 'end'}
-          loading={saving}
-          onClick={() => form.submit()}
-        >
-          {copy.action}
-        </Button>,
-      ]}
+      footer={(() => {
+        const cancel = (
+          <Button key='cancel' onClick={onClose}>
+            {copy.cancel}
+          </Button>
+        );
+        const go = (
+          <Button
+            key='go'
+            type='primary'
+            danger={mode === 'end'}
+            loading={saving}
+            onClick={() => form.submit()}
+          >
+            {copy.action}
+          </Button>
+        );
+        // Pausing reads "Yes / Cancel", like the other questions in the app
+        return mode === 'pause' ? [go, cancel] : [cancel, go];
+      })()}
     >
+      {copy.statement && (
+        <Typography.Paragraph strong style={{ fontSize: 18 }}>
+          {copy.statement}
+        </Typography.Paragraph>
+      )}
       <Typography.Paragraph>{copy.intro}</Typography.Paragraph>
       <Form form={form} layout='vertical' onFinish={submit} preserve={false}>
         <Form.Item

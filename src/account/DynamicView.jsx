@@ -19,7 +19,13 @@ import api, { errorMessage } from '../services/account-api';
 import useAccount from '../state/useAccount';
 import PartnerProfile from './PartnerProfile';
 import PauseEndDialog from './PauseEndDialog';
-import { EventSummary, LastActive, ROLE_LABEL, StatusTag } from './common';
+import {
+  dynamicTitle,
+  EventSummary,
+  LastActive,
+  ROLE_LABEL,
+  StatusTag,
+} from './common';
 
 function MyName({ dynamic, onSaved }) {
   const { message } = App.useApp();
@@ -113,10 +119,7 @@ export default function DynamicView() {
   const pausedByYou =
     status === 'paused' &&
     history.find((e) => e.type === 'paused')?.by === 'you';
-  const title =
-    kind === 'solo'
-      ? 'Just me'
-      : (partner?.alias ?? 'Waiting for someone to join');
+  const title = dynamicTitle(dynamic);
 
   return (
     <>
@@ -125,6 +128,43 @@ export default function DynamicView() {
         onBack={back}
         tags={<StatusTag status={status} />}
       />
+
+      {/* The way to stop is the biggest thing on the page, and always in the same place */}
+      {status === 'active' && (
+        <div style={{ maxWidth: 560, marginBottom: 24 }}>
+          <Button
+            block
+            size='large'
+            onClick={() => setDialog('pause')}
+            style={{
+              height: 88,
+              fontSize: 30,
+              fontWeight: 600,
+              background: '#faad14',
+              borderColor: '#faad14',
+              color: '#000',
+            }}
+          >
+            Pause
+          </Button>
+          <Typography.Text type='secondary'>
+            Stops everything where it is. It is not a substitute for talking.
+          </Typography.Text>
+        </div>
+      )}
+      {pausedByYou && (
+        <div style={{ maxWidth: 560, marginBottom: 24 }}>
+          <Button
+            block
+            type='primary'
+            size='large'
+            style={{ height: 88, fontSize: 30, fontWeight: 600 }}
+            onClick={() => act(api.resume(id), 'Resumed')}
+          >
+            Resume
+          </Button>
+        </div>
+      )}
 
       {status === 'paused' && (
         <Alert
@@ -164,7 +204,7 @@ export default function DynamicView() {
         <Descriptions.Item label='You are'>
           {ROLE_LABEL[you.role]}
         </Descriptions.Item>
-        <Descriptions.Item label='They call you'>
+        <Descriptions.Item label='Your name here'>
           {status === 'ended' ? (
             you.alias
           ) : (
@@ -182,14 +222,6 @@ export default function DynamicView() {
       </Descriptions>
 
       <Space wrap style={{ margin: '16px 0 24px' }}>
-        {status === 'active' && (
-          <Button onClick={() => setDialog('pause')}>Pause</Button>
-        )}
-        {pausedByYou && (
-          <Button type='primary' onClick={() => act(api.resume(id), 'Resumed')}>
-            Resume
-          </Button>
-        )}
         {(status === 'active' || status === 'paused') && (
           <Button danger onClick={() => setDialog('end')}>
             End

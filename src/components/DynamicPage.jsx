@@ -4,11 +4,12 @@ import { Alert, Button, Empty, Select, Spin } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/account-api';
 import useAccount from '../state/useAccount';
+import { dynamicTitle } from '../account/common';
 import PageHeader from './PageHeader';
 
 export const SELECTED_DYNAMIC_KEY = 'selected-dynamic';
 
-const label = (d) => (d.kind === 'solo' ? 'Just me' : d.partner.alias);
+const label = dynamicTitle;
 
 /**
  * A page about one dynamic at a time, with a selector at the top right for

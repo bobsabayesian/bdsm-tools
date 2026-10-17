@@ -2,6 +2,17 @@ import React from 'react';
 import { Tag, Tooltip, Typography } from 'antd';
 import moment from 'moment';
 
+/**
+ * What a dynamic is called: your name in it, then your partner's - "Sir - Bob".
+ * (Alone, just your name; "Me" is the default and reads better as "Just me".)
+ */
+export const dynamicTitle = (dynamic) => {
+  const { kind, you, partner } = dynamic;
+  if (kind === 'solo') return you.alias === 'Me' ? 'Just me' : you.alias;
+  if (!partner) return `${you.alias} - waiting for someone to join`;
+  return `${you.alias} - ${partner.alias}`;
+};
+
 export const ROLE_LABEL = { dom: 'Dominant', sub: 'Submissive', self: 'Solo' };
 
 export const REASONS = [

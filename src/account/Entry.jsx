@@ -10,12 +10,13 @@ import {
   Tabs,
   Typography,
 } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import api, { errorMessage } from '../services/account-api';
 import useAccount from '../state/useAccount';
 import AccountSettings from './AccountSettings';
 import Dynamics from './Dynamics';
+import ProfileSection from './ProfileSection';
 
 const passwordRules = [
   { required: true, message: 'Enter a password' },
@@ -217,19 +218,42 @@ export default function Entry() {
   const navigate = useNavigate();
   const [recoveryCode, setRecoveryCode] = React.useState(null);
   const [then, setThen] = React.useState(null); // where to go once the code is saved
+  const [profile, setProfile] = React.useState(null);
+  const { hash } = useLocation();
 
   React.useEffect(() => {
     refresh();
   }, []);
 
+  const loadProfile = () =>
+    api
+      .getProfile()
+      .then(setProfile)
+      .catch(() => {}); // the page still works without the summary
+  const loggedIn = !!user;
+  React.useEffect(() => {
+    if (loggedIn) loadProfile();
+  }, [loggedIn]);
+
+  // "My profile" and "My dynamics" in the header both come here, to their own section
+  React.useEffect(() => {
+    if (!profile || !hash) return;
+    const target = document.getElementById(hash.slice(1));
+    if (target && target.scrollIntoView)
+      target.scrollIntoView({ behavior: 'smooth' });
+  }, [hash, !!profile]);
+
   return (
     <>
-      <PageHeader title='My dynamics' />
+      <PageHeader title='My account' />
       {!loaded ? (
         <Spin size='large' />
       ) : user ? (
         <>
-          <Dynamics />
+          {profile && (
+            <ProfileSection profile={profile} onChanged={loadProfile} />
+          )}
+          <Dynamics displayName={profile?.me.displayName ?? ''} />
           <AccountSettings />
         </>
       ) : (

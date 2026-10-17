@@ -92,6 +92,15 @@ database, as sign-ups are rate limited per IP):
 $ BASE=http://localhost:8787 node scripts/smoke-accounts.mjs
 ```
 
+### The path through the app
+
+**My profile** and **My dynamics** in the header both open the account page (`/account`), which has your
+profile first - a summary of each part with an **Edit** button, and **Edit my profile** - and your dynamics
+below it. Each dynamic's page has a very large **Pause** button at the top. Pressing it says "This is not a
+substitute for a discussion." and asks Yes or Cancel (a reason and note are invited, never required); the
+person who paused gets a large **Resume** in its place, and the other person is told. Ending a dynamic is
+smaller, below it.
+
 ### About me
 
 A person's profile lives at **About me** (`/account/about`, linked as "My profile" in the header), with
@@ -101,6 +110,10 @@ that About me is where everything is edited. Each tab saves on its own and shows
 unsaved changes. The people in a person's dynamics see exactly the same tabs, read-only, on the
 dynamic's page (`PartnerProfile`).
 
+- **A dynamic is titled with the two names in it**, yours first: you as "Sir" with a partner who is "Bob" see
+  "Sir - Bob" (Bob sees "Bob - Sir"). A **display name** on the Me tab is the name filled in for you when you
+  start or join a dynamic; it is private, and each dynamic can use a different name - partners only ever see the
+  name you use with them.
 - **Me** is optional and nothing depends on it: gender (from the admin "Genders" list, if any), pronouns
   (free text) and "things my partner should know".
 - **My Body** is about what someone wants _included_ in tasks, not their anatomy or identity - nobody

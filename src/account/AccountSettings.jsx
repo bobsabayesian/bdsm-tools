@@ -121,9 +121,6 @@ export default function AccountSettings() {
               <Button onClick={() => api.logout().finally(() => setUser(null))}>
                 Log out
               </Button>
-              <Button onClick={() => navigate('/account/about')}>
-                Edit my profile
-              </Button>
               <ChangePassword />
               <DeleteAccount />
             </Space>

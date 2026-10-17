@@ -233,6 +233,7 @@ assert.deepEqual(profile.me, {
   pronouns: [],
   about: '',
   ruleChangeMinDays: 7,
+  displayName: '',
 });
 assert.equal(
   (await b.call('PUT', '/profile/me', { genders: ['nonsense'] })).status,
@@ -266,6 +267,7 @@ assert.deepEqual((await b.call('GET', '/profile')).json.me, {
   pronouns: ['they/them', 'she/her'],
   about: 'I like a plan.',
   ruleChangeMinDays: 7,
+  displayName: '',
 });
 assert.equal(
   (await b.call('PUT', '/profile/me', {})).status,
@@ -276,6 +278,58 @@ await b.call('PUT', '/profile/me', {
   pronouns: ['they/them'],
   about: 'I like a plan.',
 });
+
+step('the display name is a private default for naming yourself in a dynamic');
+assert.equal(
+  (await b.call('PUT', '/profile/me', { displayName: 'x'.repeat(41) })).status,
+  400,
+);
+assert.equal(
+  (await b.call('PUT', '/profile/me', { displayName: 7 })).status,
+  400,
+);
+assert.equal(
+  (await b.call('PUT', '/profile/me', { displayName: '  Bob\u0007  ' })).status,
+  204,
+);
+assert.equal(
+  (await b.call('GET', '/profile')).json.me.displayName,
+  'Bob',
+  'trimmed, control characters removed',
+);
+assert.equal(
+  (
+    await b.call('PUT', '/profile/me', {
+      pronouns: ['they/them'],
+      about: 'I like a plan.',
+    })
+  ).status,
+  204,
+);
+assert.equal(
+  (await b.call('GET', '/profile')).json.me.displayName,
+  'Bob',
+  'left alone when not sent',
+);
+assert.equal(
+  (await b.call('PUT', '/profile/me', { displayName: '' })).status,
+  204,
+);
+assert.equal(
+  (await b.call('GET', '/profile')).json.me.displayName,
+  '',
+  'an empty name clears it',
+);
+assert.equal(
+  (
+    await b.call('PUT', '/profile/me', {
+      displayName: 'Bob',
+      pronouns: ['they/them'],
+      about: 'I like a plan.',
+    })
+  ).status,
+  204,
+);
 
 step('the Me tab also holds the rule change minimum (days), default 7');
 for (const bad of [-1, 366, 1.5, '7', null]) {
@@ -587,6 +641,10 @@ assert.deepEqual(
     ruleChangeMinDays: 7,
   },
   'and so are the Me details',
+);
+assert.ok(
+  !('displayName' in seenByAlice.me),
+  "a partner never sees someone's display name",
 );
 assert.equal(
   (await c.call('GET', `/dynamics/${abId}/profile`)).status,

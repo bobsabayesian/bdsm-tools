@@ -24,6 +24,7 @@ const MAX_PRONOUN_LENGTH = 40;
 
 const normalise = (me) =>
   JSON.stringify([
+    me.displayName,
     [...me.genders].sort(),
     me.pronouns,
     me.about.trim(),
@@ -90,6 +91,24 @@ export default function MeSection({ onDirty }) {
           They can see this &mdash; nothing is hidden between you. You can
           change it at any time.
         </Typography.Text>
+
+        <div>
+          <Typography.Text strong>Display name</Typography.Text>
+          <Typography.Paragraph type='secondary' style={{ margin: 0 }}>
+            The name filled in for you when you start or join a dynamic, so it
+            shows up as, say, &ldquo;Sir - Bob&rdquo;. You can use a different
+            name in each dynamic, and the people in one only ever see the name
+            you use with them.
+          </Typography.Paragraph>
+          <Input
+            maxLength={40}
+            style={{ marginTop: 4, maxWidth: 320 }}
+            aria-label='Display name'
+            placeholder='e.g. Sir'
+            value={me.displayName ?? ''}
+            onChange={(e) => setMe({ ...me, displayName: e.target.value })}
+          />
+        </div>
 
         {genders.length > 0 && (
           <div>

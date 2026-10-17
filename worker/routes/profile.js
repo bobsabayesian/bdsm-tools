@@ -26,6 +26,7 @@ const STEPS = {
 const MAX_PRONOUNS = 10;
 const MAX_PRONOUN_LENGTH = 40;
 const MAX_ABOUT = 2000;
+const MAX_DISPLAY_NAME = 40; // the same limit as a name within a dynamic
 const MAX_CHOICES = 600;
 
 export const profile = new Hono();
@@ -60,11 +61,18 @@ const markShared = (db, userId, now) =>
     .bind(now, userId);
 
 // `minDays` is the person's own "rule change minimum" (kept on the user)
-export const readAbout = (row, minDays = DEFAULT_MIN_DAYS) => ({
+// `displayName` is only passed when a person reads their own - it is a private
+// default for naming themselves in a dynamic, never shown to partners.
+export const readAbout = (
+  row,
+  minDays = DEFAULT_MIN_DAYS,
+  displayName = undefined,
+) => ({
   genders: row ? JSON.parse(row.genders) : [],
   pronouns: row ? JSON.parse(row.pronouns) : [],
   about: row ? row.about : '',
   ruleChangeMinDays: minDays,
+  ...(displayName === undefined ? {} : { displayName: displayName ?? '' }),
 });
 
 const readSteps = async (db, userId) => {
@@ -100,13 +108,16 @@ profile.get('/', async (c) => {
       .first(),
   ]);
 
-  const { profile_shared_at: sharedAt, rule_change_min_days: minDays } =
-    await db
-      .prepare(
-        'SELECT profile_shared_at, rule_change_min_days FROM users WHERE id = ?',
-      )
-      .bind(userId)
-      .first();
+  const {
+    profile_shared_at: sharedAt,
+    rule_change_min_days: minDays,
+    display_name: displayName,
+  } = await db
+    .prepare(
+      'SELECT profile_shared_at, rule_change_min_days, display_name FROM users WHERE id = ?',
+    )
+    .bind(userId)
+    .first();
 
   const steps = available.map((id) => ({ id, status: done[id] ?? null }));
   return c.json({
@@ -116,7 +127,7 @@ profile.get('/', async (c) => {
       sharedAt,
       needsReview: !sharedAt && (results.length > 0 || !!aboutRow),
     },
-    me: readAbout(aboutRow, minDays),
+    me: readAbout(aboutRow, minDays, displayName),
     nextStep: steps.find((step) => !step.status)?.id ?? null,
     selections: Object.fromEntries(
       Object.keys(STEPS).map((id) => [
@@ -147,6 +158,15 @@ profile.put('/me', async (c) => {
     body.ruleChangeMinDays === undefined
       ? undefined
       : wholeDays(body.ruleChangeMinDays);
+  // The name pre-filled when starting or joining a dynamic; '' clears it
+  // eslint-disable-next-line no-control-regex
+  const controls = /[\u0000-\u001f]/g;
+  const displayName =
+    body.displayName === undefined
+      ? undefined
+      : typeof body.displayName === 'string'
+        ? body.displayName.replace(controls, '').trim()
+        : null;
   const textList = (list) =>
     Array.isArray(list) &&
     list.every((item) => typeof item === 'string' && item.trim().length > 0);
@@ -157,7 +177,9 @@ profile.put('/me', async (c) => {
     pronouns.some((item) => item.length > MAX_PRONOUN_LENGTH) ||
     typeof about !== 'string' ||
     about.length > MAX_ABOUT ||
-    minDays === null
+    minDays === null ||
+    displayName === null ||
+    (displayName !== undefined && displayName.length > MAX_DISPLAY_NAME)
   ) {
     return c.json({ error: 'Invalid details' }, 400);
   }
@@ -196,6 +218,13 @@ profile.put('/me', async (c) => {
           db
             .prepare('UPDATE users SET rule_change_min_days = ? WHERE id = ?')
             .bind(minDays, userId),
+        ]),
+    ...(displayName === undefined
+      ? []
+      : [
+          db
+            .prepare('UPDATE users SET display_name = ? WHERE id = ?')
+            .bind(displayName || null, userId),
         ]),
     markShared(db, userId, now),
   ]);

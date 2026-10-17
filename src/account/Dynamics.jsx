@@ -16,14 +16,20 @@ import {
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../services/account-api';
-import { EventSummary, LastActive, ROLE_LABEL, StatusTag } from './common';
+import {
+  dynamicTitle,
+  EventSummary,
+  LastActive,
+  ROLE_LABEL,
+  StatusTag,
+} from './common';
 
 const aliasRules = [
   { required: true, message: 'Choose a name' },
   { max: 40, message: 'At most 40 characters' },
 ];
 
-function InviteModal({ open, onClose, onCreated }) {
+function InviteModal({ open, onClose, onCreated, displayName }) {
   const [invite, setInvite] = React.useState(null);
   const [error, setError] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
@@ -66,8 +72,10 @@ function InviteModal({ open, onClose, onCreated }) {
         </>
       ) : (
         <Form
+          // starts again if the saved name turns up after the dialog opened
+          key={displayName}
           layout='vertical'
-          initialValues={{ role: 'dom' }}
+          initialValues={{ role: 'dom', alias: displayName || undefined }}
           onFinish={({ role, alias }) => {
             setSaving(true);
             setError(null);
@@ -107,7 +115,7 @@ function InviteModal({ open, onClose, onCreated }) {
   );
 }
 
-function JoinModal({ open, onClose, onJoined }) {
+function JoinModal({ open, onClose, onJoined, displayName }) {
   const [preview, setPreview] = React.useState(null);
   const [code, setCode] = React.useState('');
   const [error, setError] = React.useState(null);
@@ -162,7 +170,9 @@ function JoinModal({ open, onClose, onJoined }) {
         </Form>
       ) : (
         <Form
+          key={displayName}
           layout='vertical'
+          initialValues={{ alias: displayName || undefined }}
           onFinish={({ alias }) =>
             run(
               api.joinDynamic(code, alias).then((joined) => {
@@ -201,13 +211,8 @@ function JoinModal({ open, onClose, onJoined }) {
 }
 
 function DynamicCard({ dynamic, onOpen }) {
-  const { kind, status, partner, you, lastEvent } = dynamic;
-  const title =
-    kind === 'solo'
-      ? 'Just me'
-      : status === 'invited'
-        ? 'Waiting for someone to join'
-        : partner.alias;
+  const { status, you, lastEvent } = dynamic;
+  const title = dynamicTitle(dynamic);
 
   return (
     <Card
@@ -220,7 +225,7 @@ function DynamicCard({ dynamic, onOpen }) {
     >
       <Space orientation='vertical' size={2} style={{ width: '100%' }}>
         <Typography.Text type='secondary'>
-          You: {ROLE_LABEL[you.role]}, as &ldquo;{you.alias}&rdquo;
+          You: {ROLE_LABEL[you.role]}
         </Typography.Text>
         <LastActive dynamic={dynamic} />
         {(status === 'paused' || status === 'ended') && lastEvent && (
@@ -231,14 +236,12 @@ function DynamicCard({ dynamic, onOpen }) {
   );
 }
 
-export default function Dynamics() {
+export default function Dynamics({ displayName = '' }) {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const [dynamics, setDynamics] = React.useState(null);
   const [inviting, setInviting] = React.useState(false);
   const [joining, setJoining] = React.useState(false);
-  const [setupPending, setSetupPending] = React.useState(false);
-  const [needsReview, setNeedsReview] = React.useState(false);
 
   const load = () =>
     api
@@ -248,13 +251,6 @@ export default function Dynamics() {
 
   React.useEffect(() => {
     load();
-    api
-      .getProfile()
-      .then((profile) => {
-        setSetupPending(!!profile.nextStep);
-        setNeedsReview(profile.sharing.needsReview);
-      })
-      .catch(() => {}); // the prompt is a nicety
   }, []);
 
   const open = (dynamic) => navigate(`/account/dynamics/${dynamic.id}`);
@@ -262,53 +258,10 @@ export default function Dynamics() {
   const ended = (dynamics ?? []).filter((d) => d.status === 'ended');
 
   return (
-    <>
-      {needsReview && (
-        <Alert
-          type='warning'
-          showIcon
-          style={{ marginBottom: 16 }}
-          title='Your partners can now see your choices'
-          description='You answered these when they were private. In a dynamic everything is open between you, so nothing is shown to anyone until you confirm. Take a look at your choices first if you like.'
-          action={
-            <Space>
-              <Button size='small' onClick={() => navigate('/account/about')}>
-                Review
-              </Button>
-              <Button
-                size='small'
-                type='primary'
-                onClick={() =>
-                  api
-                    .shareProfile()
-                    .then(() => setNeedsReview(false))
-                    .catch((e) => message.error(errorMessage(e)))
-                }
-              >
-                I understand, share them
-              </Button>
-            </Space>
-          }
-        />
-      )}
-      {setupPending && (
-        <Alert
-          type='info'
-          showIcon
-          style={{ marginBottom: 16 }}
-          title='Finish setting up your profile'
-          description='Tell us what you would like included in tasks and how you feel about different things. It takes a few minutes and you can change it later.'
-          action={
-            <Button
-              size='small'
-              type='primary'
-              onClick={() => navigate('/account/setup')}
-            >
-              Set up
-            </Button>
-          }
-        />
-      )}
+    <section id='dynamics'>
+      <Typography.Title level={3} style={{ marginTop: 0 }}>
+        My dynamics
+      </Typography.Title>
       <Space wrap style={{ marginBottom: 24 }}>
         <Button type='primary' onClick={() => setInviting(true)}>
           Invite someone
@@ -320,7 +273,7 @@ export default function Dynamics() {
           )}
           onClick={() =>
             api
-              .startSolo()
+              .startSolo(displayName || undefined)
               .then(open)
               .catch((e) => message.error(errorMessage(e)))
           }
@@ -364,12 +317,14 @@ export default function Dynamics() {
         open={inviting}
         onClose={() => setInviting(false)}
         onCreated={load}
+        displayName={displayName}
       />
       <JoinModal
         open={joining}
         onClose={() => setJoining(false)}
         onJoined={open}
+        displayName={displayName}
       />
-    </>
+    </section>
   );
 }

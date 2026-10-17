@@ -19,8 +19,8 @@ function AccountStatus() {
 
   return (
     <Space size='middle' wrap>
-      <Link to='/account/about'>My profile</Link>
-      <Link to='/account'>My dynamics</Link>
+      <Link to='/account#profile'>My profile</Link>
+      <Link to='/account#dynamics'>My dynamics</Link>
       <Typography.Text type='secondary'>{user.username}</Typography.Text>
       <Button
         size='small'
