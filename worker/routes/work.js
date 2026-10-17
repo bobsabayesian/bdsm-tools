@@ -303,7 +303,7 @@ dynamicWork.post('/:id/tasks', async (c) => {
     ? input.attested.filter(
         (a) =>
           typeof a?.key === 'string' &&
-          (a.direction === 'give' || a.direction === 'receive'),
+          ['give', 'receive', 'any'].includes(a.direction),
       )
     : [];
   const options = availability(task, selections);

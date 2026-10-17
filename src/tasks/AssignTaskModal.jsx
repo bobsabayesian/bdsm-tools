@@ -16,12 +16,11 @@ import {
   Typography,
 } from 'antd';
 import useCatalog from '../hooks/useCatalog';
+import { kinkWithSide } from '../account/kinkText';
 import { fieldDefaults, renderFields } from '../components/FieldsForm';
 import api, { errorData, errorMessage } from '../services/tasks-api';
 import { SoftLimitDialog } from './Attest';
 import { PROOF_LABEL } from './proofs';
-
-const SIDE = { give: 'giving', receive: 'receiving' };
 
 const asOptions = (items) =>
   items.map((i) => ({ value: i.value, label: i.label }));
@@ -126,7 +125,15 @@ export default function AssignTaskModal({
     }
     if (a.hardLimits.length) {
       parts.push(
-        `crosses a hard limit: ${a.hardLimits.map((h) => `${label(kinks, h.key)} (${SIDE[h.direction]})`).join(', ')}`,
+        `crosses a hard limit: ${a.hardLimits
+          .map((h) =>
+            kinkWithSide(
+              kinks.find((k) => k.value === h.key),
+              h.direction,
+              h.key,
+            ),
+          )
+          .join(', ')}`,
       );
     }
     return parts.join('; ');
@@ -156,7 +163,15 @@ export default function AssignTaskModal({
       if (data.code === 'attestation-required') setAttest(data.missing);
       else if (data.code === 'hard-limit') {
         setError(
-          `That task crosses a hard limit: ${data.hardLimits.map((h) => `${label(kinks, h.key)} (${SIDE[h.direction]})`).join(', ')}`,
+          `That task crosses a hard limit: ${data.hardLimits
+            .map((h) =>
+              kinkWithSide(
+                kinks.find((k) => k.value === h.key),
+                h.direction,
+                h.key,
+              ),
+            )
+            .join(', ')}`,
         );
       } else setError(errorMessage(e));
     } finally {
@@ -262,9 +277,12 @@ export default function AssignTaskModal({
                                   <Tag color='orange'>
                                     touches a soft limit:{' '}
                                     {a.softLimits
-                                      .map(
-                                        (s) =>
-                                          `${label(kinks, s.key)} (${SIDE[s.direction]})`,
+                                      .map((s) =>
+                                        kinkWithSide(
+                                          kinks.find((k) => k.value === s.key),
+                                          s.direction,
+                                          s.key,
+                                        ),
                                       )
                                       .join(', ')}
                                   </Tag>

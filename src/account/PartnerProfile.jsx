@@ -2,12 +2,11 @@ import React from 'react';
 import { Card, Space, Spin, Table, Tabs, Tag, Typography } from 'antd';
 import useCatalog from '../hooks/useCatalog';
 import api from '../services/account-api';
+import { kinkWithSide, sideName } from './kinkText';
 import { LEVELS, LevelTag } from './limits';
 
 // The lists on "What's in bounds?" - a partner sees them all
 const BOUNDS = ['boundsBody', 'boundsClothing', 'equipment', 'boundsSpaces'];
-
-const SIDE_LABEL = { give: 'giving', receive: 'receiving' };
 
 // Items keep the catalog's order; anything an admin has since switched off is dropped
 const labelled = (catalog, keys) =>
@@ -37,7 +36,7 @@ function Limits({ kinks, answers }) {
             ) : (
               found.map((a) => (
                 <Tag key={`${a.key}/${a.direction}`} color={meta.color}>
-                  {a.kink.label} ({SIDE_LABEL[a.direction]})
+                  {kinkWithSide(a.kink, a.direction)}
                 </Tag>
               ))
             )}
@@ -49,17 +48,18 @@ function Limits({ kinks, answers }) {
 }
 
 function KinkTable({ kinks, answers }) {
+  const answer = (kink, direction) =>
+    answers.find((a) => a.key === kink.value && a.direction === direction)
+      ?.state;
   const rows = kinks
     .map((kink) => ({
       key: kink.value,
       kink,
-      give: answers.find((a) => a.key === kink.value && a.direction === 'give')
-        ?.state,
-      receive: answers.find(
-        (a) => a.key === kink.value && a.direction === 'receive',
-      )?.state,
+      give: answer(kink, 'give'),
+      receive: answer(kink, 'receive'),
+      any: answer(kink, 'any'),
     }))
-    .filter((row) => row.give || row.receive);
+    .filter((row) => row.give || row.receive || row.any);
 
   const categories = [
     ...new Set(rows.map((row) => row.kink.category || 'Other')),
@@ -69,29 +69,48 @@ function KinkTable({ kinks, answers }) {
     return level ? <LevelTag level={level} /> : <Nothing>not decided</Nothing>;
   };
 
-  return categories.map((category) => (
-    <div key={category} style={{ marginTop: 12 }}>
-      <Typography.Text strong>{category}</Typography.Text>
-      <Table
-        size='small'
-        pagination={false}
-        dataSource={rows.filter(
-          (row) => (row.kink.category || 'Other') === category,
-        )}
-        columns={[
-          { title: 'Kink', dataIndex: ['kink', 'label'] },
-          {
-            title: 'Giving',
-            render: (_, row) => cell(row.give, row.kink.sides !== 'receive'),
-          },
-          {
-            title: 'Receiving',
-            render: (_, row) => cell(row.receive, row.kink.sides !== 'give'),
-          },
-        ]}
-      />
-    </div>
-  ));
+  return categories.map((category) => {
+    const inCategory = rows.filter(
+      (row) => (row.kink.category || 'Other') === category,
+    );
+    // A section names its own sides ("As Dominant" / "As submissive"), or has none
+    const first = inCategory[0].kink;
+    const oneAnswer = inCategory.every((row) => row.kink.sides === 'any');
+    return (
+      <div key={category} style={{ marginTop: 12 }}>
+        <Typography.Text strong>{category}</Typography.Text>
+        <Table
+          size='small'
+          pagination={false}
+          dataSource={inCategory}
+          columns={[
+            { title: 'Kink', dataIndex: ['kink', 'label'] },
+            ...(oneAnswer
+              ? [{ title: 'Feeling', render: (_, row) => cell(row.any, true) }]
+              : [
+                  {
+                    title: sideName(first, 'give'),
+                    render: (_, row) =>
+                      cell(
+                        row.give,
+                        row.kink.sides !== 'receive' &&
+                          row.kink.sides !== 'any',
+                      ),
+                  },
+                  {
+                    title: sideName(first, 'receive'),
+                    render: (_, row) =>
+                      cell(
+                        row.receive,
+                        row.kink.sides !== 'give' && row.kink.sides !== 'any',
+                      ),
+                  },
+                ]),
+          ]}
+        />
+      </div>
+    );
+  });
 }
 
 /**

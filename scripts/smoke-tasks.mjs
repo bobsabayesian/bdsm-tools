@@ -67,17 +67,12 @@ const pair = (
 ).json;
 const P = `/dynamics/${pair.id}`;
 
+// the kinks used below ('spanking', 'blindfolds' ...) come from the real list
 await admin('/catalogs/kinks/items', {
   key: 'spanking',
   label: 'Spanking',
   category: 'Impact',
-  order: 1,
-});
-await admin('/catalogs/kinks/items', {
-  key: 'blindfolds',
-  label: 'Blindfolds',
-  category: 'Sensation',
-  order: 2,
+  order: 9001,
 });
 await sub.call('PUT', '/profile/bodyParts', { keys: ['mouth'] });
 await sub.call('PUT', '/profile/equipment', { keys: ['rope'] });
@@ -87,6 +82,9 @@ await sub.call('PUT', '/profile/kinks', {
   choices: [
     { key: 'spanking', direction: 'receive', state: 'hard-limit' },
     { key: 'blindfolds', direction: 'receive', state: 'soft-limit' },
+    // kinks with a single answer (no sides)
+    { key: 'exhibitionism-voyeurism', direction: 'any', state: 'soft-limit' },
+    { key: 'group-sex', direction: 'any', state: 'hard-limit' },
   ],
 });
 
@@ -99,6 +97,8 @@ await add('Needs rope', { requiresEquipment: ['rope'] });
 await add('Needs neck', { requiresBoundsBody: ['neck'] });
 await add('Needs feet in bounds', { requiresBoundsBody: ['feet'] });
 await add('Wear pants', { requiresClothing: ['pants'] });
+await add('Be watched', { kinksGeneral: ['exhibitionism-voyeurism'] });
+await add('Group scene', { kinksGeneral: ['group-sex'] });
 await add('Wear a thong', { requiresClothing: ['thong'] });
 await add('Spank', { kinksReceiving: ['spanking'] });
 await add('Blindfolded', { kinksReceiving: ['blindfolds'] });
@@ -199,6 +199,16 @@ assert.equal(by['Wear pants'].assignable, true);
 assert.deepEqual(by['Wear a thong'].reasons, [
   { code: 'clothing', keys: ['thong'] },
 ]);
+assert.deepEqual(
+  by['Be watched'].softLimits,
+  [{ key: 'exhibitionism-voyeurism', direction: 'any' }],
+  'a single-answer kink can be a soft limit',
+);
+assert.equal(by['Be watched'].assignable, true);
+assert.deepEqual(by['Group scene'].hardLimits, [
+  { key: 'group-sex', direction: 'any' },
+]);
+assert.equal(by['Group scene'].assignable, false);
 // My Body is a separate list: 'mouth' is in My Body but not in bounds
 assert.equal(
   (
@@ -233,6 +243,24 @@ assert.equal((await sub.call('GET', `${P}/task-fields`)).status, 403);
 step('assigning is refused, on the server, when it should be');
 const assign = (templateId, extra = {}) =>
   dom.call('POST', `${P}/tasks`, { templateId, ...extra });
+const groupAttempt = await assign(lib['Group scene'], {
+  attested: [{ key: 'group-sex', direction: 'any' }],
+});
+assert.equal(
+  groupAttempt.json.code,
+  'hard-limit',
+  'a hard limit on a themed kink is refused whatever is attested',
+);
+const watchAttempt = await assign(lib['Be watched']);
+assert.equal(watchAttempt.json.code, 'attestation-required');
+assert.deepEqual(watchAttempt.json.missing, [
+  { key: 'exhibitionism-voyeurism', direction: 'any' },
+]);
+assert.equal(
+  (await assign(lib['Be watched'], { attested: watchAttempt.json.missing }))
+    .status,
+  201,
+);
 assert.equal((await assign(lib['Needs feet'])).json.code, 'unavailable');
 assert.equal((await assign(lib.Photo)).json.code, 'unavailable');
 const hard = await assign(lib.Spank, {

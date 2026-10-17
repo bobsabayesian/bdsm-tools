@@ -199,3 +199,47 @@ test('a hard limit refuses whatever has been attested', () => {
     { key: 'spanking', direction: 'receive' },
   ]);
 });
+
+test('a kink with no sides has one answer, and a task can touch it', () => {
+  assert.deepEqual(sidesFor('any'), ['any']);
+  const selections = [
+    {
+      catalog: 'kinks',
+      key: 'exhibitionism',
+      direction: 'any',
+      state: 'hard-limit',
+    },
+    { catalog: 'kinks', key: 'erp', direction: 'any', state: 'soft-limit' },
+    {
+      catalog: 'kinks',
+      key: 'discipline',
+      direction: 'receive',
+      state: 'hard-limit',
+    },
+  ];
+  assert.deepEqual(
+    hardLimitConflicts({ kinksGeneral: ['exhibitionism'] }, selections),
+    [{ key: 'exhibitionism', direction: 'any' }],
+  );
+  assert.deepEqual(softLimitFlags({ kinksGeneral: ['erp'] }, selections), [
+    { key: 'erp', direction: 'any' },
+  ]);
+  // a general kink is not the same as a given or received one
+  assert.deepEqual(
+    hardLimitConflicts({ kinksGiving: ['exhibitionism'] }, selections),
+    [],
+  );
+  assert.deepEqual(
+    hardLimitConflicts({ kinksGeneral: ['discipline'] }, selections),
+    [],
+  );
+  const result = assessAssignment({ kinksGeneral: ['erp'] }, selections);
+  assert.equal(result.reason, 'attestation-required');
+  assert.deepEqual(result.missing, [{ key: 'erp', direction: 'any' }]);
+  assert.equal(
+    assessAssignment({ kinksGeneral: ['erp'] }, selections, [
+      { key: 'erp', direction: 'any' },
+    ]).allowed,
+    true,
+  );
+});

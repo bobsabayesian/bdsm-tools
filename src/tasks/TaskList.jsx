@@ -16,13 +16,12 @@ import {
 import api, { errorMessage } from '../services/tasks-api';
 import { When } from '../account/common';
 import useCatalog from '../hooks/useCatalog';
+import { kinkWithSide } from '../account/kinkText';
 import AssignTaskModal from './AssignTaskModal';
 import CommentsThread from './CommentsThread';
 import CompleteTaskModal from './CompleteTaskModal';
 import { PROOF_LABEL, ResponseSummary } from './proofs';
 import ReviewModal from './ReviewModal';
-
-const SIDE = { give: 'giving', receive: 'receiving' };
 
 const STATUS = {
   pending: { color: 'blue', label: 'To do' },
@@ -80,9 +79,12 @@ function TaskCard({
             Soft limit talked about before assigning (
             {you.canAssign ? 'you attested' : `${controllerAlias} attested`}):{' '}
             {a.attestedSoftLimits
-              .map(
-                (s) =>
-                  `${kinks.find((k) => k.value === s.key)?.label ?? s.key} (${SIDE[s.direction]})`,
+              .map((s) =>
+                kinkWithSide(
+                  kinks.find((k) => k.value === s.key),
+                  s.direction,
+                  s.key,
+                ),
               )
               .join(', ')}
           </Typography.Text>

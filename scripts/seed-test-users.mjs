@@ -1,7 +1,7 @@
 // Sets up a local playground on a LOCAL Worker:
 //   npm run seed:users
 // - three test accounts (and a dynamic between two of them), with profiles filled in
-// - if ADMIN_TOKEN is set (the top-level .env is read): a few kinks and demo tasks
+// - if ADMIN_TOKEN is set (the top-level .env is read): demo tasks, some using the limits
 // Safe to run repeatedly. Refuses to run against anything but localhost.
 const BASE = process.env.BASE ?? 'http://localhost:8787';
 const ADMIN = process.env.ADMIN_TOKEN;
@@ -57,26 +57,6 @@ for (const username of USERS) {
 
 // ---- demo kinks and tasks (needs the admin token)
 if (ADMIN) {
-  for (const kink of [
-    { key: 'spanking', label: 'Spanking', category: 'Impact', order: 1 },
-    {
-      key: 'blindfolds',
-      label: 'Blindfolds',
-      category: 'Sensation',
-      order: 2,
-      sides: 'receive',
-    },
-    { key: 'rope', label: 'Rope bondage', category: 'Restraint', order: 3 },
-    {
-      key: 'service',
-      label: 'Service',
-      category: 'Protocol',
-      order: 4,
-      sides: 'give',
-    },
-  ])
-    await admin('/catalogs/kinks/items', kink);
-
   // tasks have no unique key, so only add the ones that are not there yet
   const existingTasks = new Set(
     (
@@ -126,12 +106,26 @@ if (ADMIN) {
       proof: 'timer',
       seconds: 3600,
       requiresEquipment: ['rope'],
-      kinksReceiving: ['rope'],
     },
-    { task: 'A spanking', kinksReceiving: ['spanking'] },
     {
-      task: 'Wear a blindfold while you do your chores',
-      kinksReceiving: ['blindfolds'],
+      task: "Be teased about yesterday's mistake",
+      kinksReceiving: ['humiliation'],
+    },
+    {
+      task: 'Use formal honorifics all evening',
+      kinksReceiving: ['high-protocol'],
+    },
+    {
+      task: 'Send a good-morning message when you wake',
+      kinksGeneral: ['long-distance-remote-control'],
+    },
+    {
+      task: 'Join a group scene',
+      kinksGeneral: ['group-sex'],
+    },
+    {
+      task: 'Be watched while you do your chores',
+      kinksGeneral: ['exhibitionism-voyeurism'],
     },
     {
       task: 'Wear a thong under your clothes today',
@@ -149,9 +143,6 @@ if (ADMIN) {
 }
 
 // ---- profiles: everyone has been through setup, so tasks can be assigned
-const kinksExist =
-  ADMIN ||
-  (await fetch(`${BASE}/api/catalog/kinks`).then((r) => r.json())).length > 0;
 const profiles = {
   'dom-test': {
     parts: ['mouth', 'hands', 'feet'],
@@ -190,23 +181,27 @@ for (const [username, { parts, gear, bounds, clothing }] of Object.entries(
     ruleChangeMinDays: 7,
   });
 }
-if (kinksExist) {
-  // sub-test has a hard limit and a soft limit, so the limit handling can be seen
-  await call(sessions['sub-test'], 'PUT', '/profile/kinks', {
-    choices: [
-      { key: 'spanking', direction: 'receive', state: 'hard-limit' },
-      { key: 'blindfolds', direction: 'receive', state: 'soft-limit' },
-      { key: 'rope', direction: 'receive', state: 'like' },
-      { key: 'service', direction: 'give', state: 'love' },
-    ],
-  });
-  await call(sessions['dom-test'], 'PUT', '/profile/kinks', {
-    choices: [
-      { key: 'spanking', direction: 'give', state: 'love' },
-      { key: 'rope', direction: 'give', state: 'love' },
-    ],
-  });
-}
+// sub-test has hard and soft limits, so the limit handling can be seen
+await call(sessions['sub-test'], 'PUT', '/profile/kinks', {
+  choices: [
+    { key: 'humiliation', direction: 'receive', state: 'hard-limit' },
+    { key: 'high-protocol', direction: 'receive', state: 'soft-limit' },
+    { key: 'praise-kink', direction: 'receive', state: 'love' },
+    { key: 'aftercare', direction: 'receive', state: 'love' },
+    { key: 'service-submission', direction: 'receive', state: 'like' },
+    { key: 'exhibitionism-voyeurism', direction: 'any', state: 'soft-limit' },
+    { key: 'group-sex', direction: 'any', state: 'hard-limit' },
+  ],
+});
+await call(sessions['dom-test'], 'PUT', '/profile/kinks', {
+  choices: [
+    { key: 'high-protocol', direction: 'give', state: 'love' },
+    { key: 'discipline', direction: 'give', state: 'love' },
+    { key: 'praise-kink', direction: 'give', state: 'love' },
+    { key: 'aftercare', direction: 'give', state: 'love' },
+    { key: 'exhibitionism-voyeurism', direction: 'any', state: 'like' },
+  ],
+});
 
 // ---- dom-test <-> sub-test, if they are not already in a dynamic together
 const existing = (await call(sessions['dom-test'], 'GET', '/dynamics')).json;
@@ -229,10 +224,10 @@ console.log(
   '\ndom-test (as "Sir") and sub-test (as "kitten") are in a dynamic together; switch-test has none yet.',
 );
 console.log(
-  'sub-test has a hard limit on receiving spanking and a soft limit on receiving blindfolds.',
+  'sub-test has hard limits (receiving humiliation, group sex) and soft limits (receiving high protocol, exhibitionism).',
 );
 console.log(
   ADMIN
-    ? 'Demo kinks and tasks are in the library.'
-    : 'Set ADMIN_TOKEN (in .env) to also add demo kinks and tasks.',
+    ? 'Demo tasks are in the library (the kinks list is already loaded).'
+    : 'Set ADMIN_TOKEN (in .env) to also add demo tasks.',
 );

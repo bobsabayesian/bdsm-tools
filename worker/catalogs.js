@@ -134,7 +134,20 @@ const catalogs = {
           { label: 'Giving and receiving', value: 'both' },
           { label: 'Receiving only', value: 'receive' },
           { label: 'Giving only', value: 'give' },
+          { label: 'One answer (no sides)', value: 'any' },
         ],
+      },
+      {
+        name: 'giveLabel',
+        label: 'Name for the "giving" side',
+        type: 'string',
+        help: 'e.g. "As Dominant" - shown instead of "Giving". Leave blank for the default.',
+      },
+      {
+        name: 'receiveLabel',
+        label: 'Name for the "receiving" side',
+        type: 'string',
+        help: 'e.g. "As submissive" - shown instead of "Receiving". Leave blank for the default.',
       },
       {
         name: 'intensity',
@@ -157,6 +170,28 @@ const catalogs = {
         label: 'Body parts',
         type: 'ref',
         catalog: 'bodyParts',
+      },
+    ],
+    { public: true },
+  ),
+  // Quick starts on the kinks screen. They mark these as "Like", and only where
+  // nothing has been answered yet.
+  kinkPresets: simpleCatalog(
+    'Kink quick starts',
+    'catalog-kink-presets',
+    [
+      {
+        name: 'order',
+        label: 'Position',
+        type: 'number',
+        help: 'Lower numbers are shown first',
+      },
+      {
+        name: 'kinks',
+        label: 'Kinks',
+        type: 'ref',
+        catalog: 'kinks',
+        required: true,
       },
     ],
     { public: true },
@@ -233,6 +268,12 @@ const catalogs = {
     'In bounds: quick starts',
     'catalog-bounds-presets',
     [
+      {
+        name: 'order',
+        label: 'Position',
+        type: 'number',
+        help: 'Lower numbers are shown first',
+      },
       {
         name: 'parts',
         label: 'Body & anatomy',
@@ -428,6 +469,13 @@ const catalogs = {
         type: 'ref',
         catalog: 'kinks',
         help: 'Things the person doing this task does to someone else',
+      },
+      {
+        name: 'kinksGeneral',
+        label: 'Kinks with no sides',
+        type: 'ref',
+        catalog: 'kinks',
+        help: 'Themes that have a single answer, such as exhibitionism',
       },
     ],
   },

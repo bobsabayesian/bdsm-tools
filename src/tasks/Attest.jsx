@@ -1,9 +1,8 @@
 import React from 'react';
 import { Button, Modal, Typography } from 'antd';
 import useCatalog from '../hooks/useCatalog';
+import { kinkWithSide } from '../account/kinkText';
 import { SOFT_LIMIT_ATTESTATION, SOFT_LIMIT_PROMPT } from '../account/limits';
-
-const SIDE = { give: 'giving', receive: 'receiving' };
 
 /**
  * Shown when a task touches a soft limit. The person assigning must attest
@@ -12,7 +11,12 @@ const SIDE = { give: 'giving', receive: 'receiving' };
  */
 export function SoftLimitDialog({ open, limits, partner, onYes, onCancel }) {
   const { items: kinks } = useCatalog('kinks');
-  const nameOf = (key) => kinks.find((k) => k.value === key)?.label ?? key;
+  const describe = (limit) =>
+    kinkWithSide(
+      kinks.find((k) => k.value === limit.key),
+      limit.direction,
+      limit.key,
+    );
 
   return (
     <Modal
@@ -33,10 +37,8 @@ export function SoftLimitDialog({ open, limits, partner, onYes, onCancel }) {
       <Typography.Paragraph strong>{SOFT_LIMIT_PROMPT}</Typography.Paragraph>
       {(limits ?? []).map((limit) => (
         <Typography.Paragraph key={`${limit.key}/${limit.direction}`}>
-          {limit.key
-            ? `${nameOf(limit.key)} (${SIDE[limit.direction]})`
-            : 'A soft limit'}{' '}
-          &mdash; {partner ?? 'your partner'} has marked this as a soft limit.
+          {limit.key ? describe(limit) : 'A soft limit'} &mdash;{' '}
+          {partner ?? 'your partner'} has marked this as a soft limit.
         </Typography.Paragraph>
       ))}
       <Typography.Paragraph>{SOFT_LIMIT_ATTESTATION}</Typography.Paragraph>

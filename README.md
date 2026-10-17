@@ -130,14 +130,27 @@ dynamic's page (`PartnerProfile`).
 
 ### Kinks and limits
 
-Once at least one kink is active in the admin tool, the **My Kinks** tab (and a setup step) lets people rate
-each kink, separately for **giving** and **receiving**, on a five-point scale: hard limit, soft
-limit, indifferent, like, love (blank means "not decided"). A kink can be limited to one side with
-its "Ask about" setting.
+The kinks list (194 items in 24 sections, loaded by `migrations/0014_kinks_list.sql`; editable in admin) is
+rated on a five-point scale - hard limit, soft limit, indifferent, like, love (blank means "not decided") -
+once for **each side** of a kink. What the two sides mean comes from each section's "Applicable to" line and is
+kept on the kinks as labels: Giving / Receiving, **As Dominant / As submissive**, **As aggressor / As target**,
+**As actor / As subject**, or **Partner / Self** for the fantasy sections. Themes with no sides (groupings,
+taboo themes, fluids) have **one answer**. Choices are shared with partners like the rest of the profile.
+
+**Kinks are what you like; "What's in bounds?" is what's on the table** (what you have and are willing to use).
+Some things - gags, blindfolds, rope - are in both on purpose, and the kinks page says so at the top. Tasks check
+each list on its own.
+
+The page (`src/account/KinksStep.jsx`) is built to be easy to take in: sections that fold away with a count
+("14 of 36 answered"), an overall progress bar, a search, "only what I haven't answered", **quick starts**
+(Gentle/Praise/Self-Care, Strict Protocol, Tease/Edging/Denial, Sensual & Exhibitionist, Impact & Pain, Humiliation
+
+- they mark things "Like", and only where nothing is answered yet), and "set everything I haven't answered in this
+  section to..." for a whole section at once. There is deliberately no "select everything".
 
 - **Hard limits** are enforced by the app: a task is never offered to someone with a hard limit on
   a kink it involves. Tasks list their kinks from the doer's point of view (`kinksReceiving` /
-  `kinksGiving`) and `hardLimitConflicts` in `worker/limits.js` does the check.
+  `kinksGiving`, and `kinksGeneral` for themes with no sides) and `hardLimitConflicts` in `worker/limits.js` does the check.
 - **Soft limits** are a conversation, and the person _assigning_ attests to it. When a task touches
   one, they are shown a flag naming that kink - _"Assignments should never be a surprise to your
   partner."_ - and must attest _"I attest that we've talked about this soft limit."_ (Yes), or Cancel,

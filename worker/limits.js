@@ -23,10 +23,36 @@ export const LEVELS = [
 
 const SIDES = ['give', 'receive'];
 
-/** Which directions can be answered for a kink (default: both) */
+/**
+ * Which directions can be answered for a kink: 'give' and 'receive' (the default),
+ * only one of them, or 'any' for a kink with no sides at all (a theme such as
+ * "Exhibitionism" is just liked or not - there is one answer).
+ */
 export const sidesFor = (sides) => {
+  if (sides === 'any') return ['any'];
   if (sides === 'give' || sides === 'receive') return [sides];
   return SIDES;
+};
+
+// Which of a task's lists of kinks goes with which direction of answer
+const TASK_KINKS = [
+  ['kinksReceiving', 'receive'],
+  ['kinksGiving', 'give'],
+  ['kinksGeneral', 'any'],
+];
+
+/** The kinks in a task that the person has given this state, as [{ key, direction }] */
+const touching = (task, selections, state) => {
+  const marked = new Set(
+    selections
+      .filter((row) => row.catalog === 'kinks' && row.state === state)
+      .map((row) => `${row.key}/${row.direction}`),
+  );
+  return TASK_KINKS.flatMap(([field, direction]) =>
+    (task[field] ?? [])
+      .filter((key) => marked.has(`${key}/${direction}`))
+      .map((key) => ({ key, direction })),
+  );
 };
 
 /**
@@ -36,21 +62,8 @@ export const sidesFor = (sides) => {
  * in a dynamic are fully open to each other - but the flag is raised at the
  * moment it matters.)
  */
-export const softLimitFlags = (task, selections) => {
-  const soft = new Set(
-    selections
-      .filter((row) => row.catalog === 'kinks' && row.state === 'soft-limit')
-      .map((row) => `${row.key}/${row.direction}`),
-  );
-  return [
-    ...(task.kinksReceiving ?? [])
-      .filter((key) => soft.has(`${key}/receive`))
-      .map((key) => ({ key, direction: 'receive' })),
-    ...(task.kinksGiving ?? [])
-      .filter((key) => soft.has(`${key}/give`))
-      .map((key) => ({ key, direction: 'give' })),
-  ];
-};
+export const softLimitFlags = (task, selections) =>
+  touching(task, selections, 'soft-limit');
 
 /** Shown with the flag, then the person assigning must attest (Yes) or Cancel */
 export const SOFT_LIMIT_PROMPT =
@@ -61,27 +74,14 @@ export const SOFT_LIMIT_ATTESTATION =
 /**
  * The kinks in a task that its assignee has made a hard limit, as
  * [{ key, direction }]. Tasks list kinks from the assignee's point of view:
- * ones they receive and ones they give.
+ * ones they receive, ones they give, and general ones (kinks with no sides).
  *
  * `selections` are rows of { catalog, key, direction, state }.
  * Because people in a dynamic see each other's limits in full, the assign
  * screen can simply say a task is unavailable and why.
  */
-export const hardLimitConflicts = (task, selections) => {
-  const hard = new Set(
-    selections
-      .filter((row) => row.catalog === 'kinks' && row.state === 'hard-limit')
-      .map((row) => `${row.key}/${row.direction}`),
-  );
-  return [
-    ...(task.kinksReceiving ?? [])
-      .filter((key) => hard.has(`${key}/receive`))
-      .map((key) => ({ key, direction: 'receive' })),
-    ...(task.kinksGiving ?? [])
-      .filter((key) => hard.has(`${key}/give`))
-      .map((key) => ({ key, direction: 'give' })),
-  ];
-};
+export const hardLimitConflicts = (task, selections) =>
+  touching(task, selections, 'hard-limit');
 
 /**
  * Can this task be assigned to someone with these selections?
