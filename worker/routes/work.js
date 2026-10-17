@@ -169,11 +169,14 @@ const presentAssignment = (row, m, counts) => {
     status: row.status,
     overdue:
       row.status === 'pending' &&
+      !row.queued &&
       !!row.due_at &&
       row.due_at < new Date().toISOString() &&
       m.status === 'active',
     task: forViewer(JSON.parse(row.task), m),
     dueAt: row.due_at,
+    queued: !!row.queued,
+    consequenceFor: row.consequence_for,
     requiresReview: !!row.requires_review,
     attestedSoftLimits: JSON.parse(row.attested_soft_limits),
     startedAt: row.started_at,
@@ -404,6 +407,21 @@ dynamicWork.post('/:id/tasks', async (c) => {
     );
   }
 
+  // A consequence is added by the person with control, for a task they marked
+  // "not done" - never automatically - and waits in the queue until started
+  let consequenceFor = null;
+  if (input.consequenceFor !== undefined && input.consequenceFor !== null) {
+    const original = await readAssignment(c, m, String(input.consequenceFor));
+    if (!original || original.status !== 'not-done') {
+      return c.json(
+        { error: 'A consequence goes with a task marked not done' },
+        409,
+      );
+    }
+    consequenceFor = original.id;
+  }
+  const queued = consequenceFor && input.queued !== false ? 1 : 0;
+
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   // How long what they submit is kept: the shorter of what the person setting
@@ -419,8 +437,9 @@ dynamicWork.post('/:id/tasks', async (c) => {
   await db
     .prepare(
       `INSERT INTO assignments (id, dynamic_id, assigned_by, assigned_to, template_id, task, status,
-         requires_review, due_at, attested_soft_limits, created_at, retention_days)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
+         requires_review, due_at, attested_soft_limits, created_at, retention_days,
+         consequence_for, queued)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -434,6 +453,8 @@ dynamicWork.post('/:id/tasks', async (c) => {
       JSON.stringify(m.kind === 'solo' ? [] : verdict.attested),
       now,
       retentionDays,
+      consequenceFor,
+      queued,
     )
     .run();
 
@@ -449,7 +470,7 @@ dynamicWork.post('/:id/tasks/:aid/start', async (c) => {
   if (!row) return c.json({ error: 'Not found' }, 404);
   if (row.assigned_to !== m.me.user_id)
     return forbid(c, 'This task is not yours to do');
-  if (row.status !== 'pending')
+  if (row.status !== 'pending' || row.queued)
     return c.json({ error: 'This task is not waiting to be done' }, 409);
   if (JSON.parse(row.task).proof !== 'timer')
     return c.json({ error: 'This task has no timer' }, 400);
@@ -469,7 +490,7 @@ dynamicWork.post('/:id/tasks/:aid/submit', async (c) => {
   if (!row) return c.json({ error: 'Not found' }, 404);
   if (row.assigned_to !== m.me.user_id)
     return forbid(c, 'This task is not yours to do');
-  if (row.status !== 'pending')
+  if (row.status !== 'pending' || row.queued)
     return c.json({ error: 'This task is not waiting to be done' }, 409);
 
   const task = JSON.parse(row.task);
@@ -529,7 +550,7 @@ dynamicWork.put('/:id/tasks/:aid/media', async (c) => {
   if (!task) return c.json({ error: 'This task does not take a file' }, 409);
   if (row.assigned_to !== m.me.user_id)
     return forbid(c, 'This task is not yours to do');
-  if (row.status !== 'pending')
+  if (row.status !== 'pending' || row.queued)
     return c.json({ error: 'This task is not waiting to be done' }, 409);
 
   const contentType = bareType(c.req.header('content-type'));
@@ -641,6 +662,29 @@ dynamicWork.post('/:id/tasks/:aid/review', async (c) => {
   );
 });
 
+// Starting a queued consequence: from now on it is an ordinary task to do
+dynamicWork.post('/:id/tasks/:aid/start-consequence', async (c) => {
+  const { m, res } = await guard(c, { write: true });
+  if (res) return res;
+  if (!m.canAssign)
+    return forbid(c, 'Only the person who assigned this can do that');
+  const row = await readAssignment(c, m, c.req.param('aid'));
+  if (!row) return c.json({ error: 'Not found' }, 404);
+  if (!row.queued || row.status !== 'pending')
+    return c.json({ error: 'That is not waiting in the queue' }, 409);
+  const input = await body(c);
+  const { due, error } = parseDue(input.dueAt);
+  if (error) return c.json({ error }, 400);
+  await c.env.DB.prepare(
+    'UPDATE assignments SET queued = 0, due_at = COALESCE(?, due_at) WHERE id = ?',
+  )
+    .bind(due, row.id)
+    .run();
+  return c.json(
+    presentAssignment(await readAssignment(c, m, row.id), m, new Map()),
+  );
+});
+
 const closeTask = (status, from) => async (c) => {
   const { m, res } = await guard(c, { write: true });
   if (res) return res;
@@ -664,7 +708,8 @@ dynamicWork.post(
   '/:id/tasks/:aid/cancel',
   closeTask('cancelled', ['pending', 'submitted']),
 );
-// A neutral record, not a punishment: nothing else changes when a task is marked not done
+// A neutral record: nothing else changes when a task is marked not done. A
+// consequence is only ever a separate, deliberate choice (see above).
 dynamicWork.post(
   '/:id/tasks/:aid/not-done',
   closeTask('not-done', ['pending']),

@@ -46,6 +46,9 @@ const RulesEntry = React.lazy(
 const ToReviewEntry = React.lazy(
   () => import(/* webpackChunkName: "Tasks" */ './tasks/ToReview'),
 );
+const ConsequencesEntry = React.lazy(
+  () => import(/* webpackChunkName: "Tasks" */ './tasks/Consequences'),
+);
 const MyTasksEntry = React.lazy(
   () => import(/* webpackChunkName: "Tasks" */ './tasks/MyTasks'),
 );
@@ -95,6 +98,7 @@ export default function Application() {
           <Route path='tasks' element={<TasksEntry />} />
           <Route path='tasks/review' element={<ToReviewEntry />} />
           <Route path='tasks/mine' element={<MyTasksEntry />} />
+          <Route path='tasks/consequences' element={<ConsequencesEntry />} />
           <Route path='rules' element={<RulesEntry />} />
           <Route path='account/about' element={<AboutMeEntry />} />
           <Route path='account/about/:tab' element={<AboutMeEntry />} />

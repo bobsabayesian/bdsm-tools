@@ -63,7 +63,9 @@ function Mine({ dynamicId, paused }) {
     );
   }
 
-  const mine = data.assignments.filter((a) => a.status !== 'cancelled');
+  const mine = data.assignments.filter(
+    (a) => a.status !== 'cancelled' && !a.queued,
+  );
   const w = windows(mine);
   const fresh = (a) => mine.find((x) => x.id === a?.id) ?? a;
   const onDay = (date) =>

@@ -7,7 +7,7 @@ const DAY = 24 * HOUR;
 
 // Open tasks fall into one of these by when they are due
 export const windows = (assignments, now = Date.now()) => {
-  const open = assignments.filter((a) => a.status === 'pending');
+  const open = assignments.filter((a) => a.status === 'pending' && !a.queued);
   const due = (a) => (a.dueAt ? new Date(a.dueAt).getTime() : null);
   const between = (from, to) =>
     open.filter((a) => due(a) !== null && due(a) >= from && due(a) < to);

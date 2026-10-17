@@ -782,6 +782,104 @@ assert.equal(
   'cancelled',
 );
 
+step('consequences: only a deliberate choice by the dom, queued until started');
+const before = (await sub.call('GET', `${P}/tasks`)).json.assignments.length;
+assert.equal(
+  (
+    await dom.call('POST', `${P}/tasks`, {
+      templateId: lib.Kneel,
+      consequenceFor: kneel.id,
+    })
+  ).status,
+  409,
+  'only for a task marked not done',
+);
+assert.equal(
+  (
+    await sub.call('POST', `${P}/tasks`, {
+      templateId: lib.Kneel,
+      consequenceFor: spare.id,
+    })
+  ).status,
+  403,
+  'the sub does not set them',
+);
+assert.equal(
+  (await sub.call('GET', `${P}/tasks`)).json.assignments.length,
+  before,
+  'marking something not done adds nothing by itself',
+);
+const penalty = await dom.call('POST', `${P}/tasks`, {
+  templateId: lib.Kneel,
+  consequenceFor: spare.id,
+});
+assert.equal(penalty.status, 201);
+assert.equal(penalty.json.queued, true);
+assert.equal(penalty.json.consequenceFor, spare.id);
+const queuedForSub = (
+  await sub.call('GET', `${P}/tasks`)
+).json.assignments.find((a) => a.id === penalty.json.id);
+assert.equal(
+  queuedForSub.queued,
+  true,
+  'nothing is hidden: the sub sees the queue',
+);
+assert.equal(
+  (
+    await sub.call('POST', `${P}/tasks/${penalty.json.id}/submit`, {
+      response: {},
+    })
+  ).status,
+  409,
+  'cannot be done while queued',
+);
+assert.equal(
+  (
+    await sub.call(
+      'POST',
+      `${P}/tasks/${penalty.json.id}/start-consequence`,
+      {},
+    )
+  ).status,
+  403,
+);
+const started = await dom.call(
+  'POST',
+  `${P}/tasks/${penalty.json.id}/start-consequence`,
+  {},
+);
+assert.equal(started.json.queued, false);
+assert.equal(started.json.consequenceFor, spare.id);
+assert.equal(
+  (
+    await dom.call(
+      'POST',
+      `${P}/tasks/${penalty.json.id}/start-consequence`,
+      {},
+    )
+  ).status,
+  409,
+  'not twice',
+);
+assert.equal(
+  (
+    await sub.call('POST', `${P}/tasks/${penalty.json.id}/submit`, {
+      response: {},
+    })
+  ).json.status,
+  'done',
+);
+const removable = await dom.call('POST', `${P}/tasks`, {
+  templateId: lib.Kneel,
+  consequenceFor: spare.id,
+});
+assert.equal(
+  (await dom.call('POST', `${P}/tasks/${removable.json.id}/cancel`, {})).json
+    .status,
+  'cancelled',
+  'a queued one can be removed',
+);
+
 step(
   'rules: the dom sets them, the sub comments, and there is nothing to approve',
 );

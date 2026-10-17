@@ -6,6 +6,7 @@ import {
   Card,
   Collapse,
   Empty,
+  Modal,
   Popconfirm,
   Space,
   Spin,
@@ -41,6 +42,8 @@ function TaskCard({
   onDo,
   onReview,
   onAct,
+  onNotDone,
+  originalTitle,
   dynamicId,
 }) {
   const [showComments, setShowComments] = React.useState(false);
@@ -55,9 +58,25 @@ function TaskCard({
       size='small'
       style={{ marginBottom: 12 }}
       title={task.task}
-      extra={<Tag color={status.color}>{status.label}</Tag>}
+      extra={
+        <Tag color={a.queued ? 'orange' : status.color}>
+          {a.queued ? 'Queued' : status.label}
+        </Tag>
+      }
     >
       <Space orientation='vertical' size={4} style={{ width: '100%' }}>
+        {a.consequenceFor && (
+          <Alert
+            type='warning'
+            showIcon
+            title={`Consequence for \u201c${originalTitle ?? 'an earlier task'}\u201d`}
+            description={
+              a.queued
+                ? `${you.canAssign ? 'Waiting in the queue until you start it' : `${controllerAlias} has added this and will start it when ready`}: ${task.task}.`
+                : `${task.task}.`
+            }
+          />
+        )}
         <Typography.Text type='secondary'>{requirement(task)}</Typography.Text>
         <Space wrap size={4}>
           <Tag>{PROOF_LABEL[task.proof ?? 'attestation']}</Tag>
@@ -116,7 +135,7 @@ function TaskCard({
         )}
 
         <Space wrap style={{ marginTop: 4 }}>
-          {you.isAssignee && a.status === 'pending' && !paused && (
+          {you.isAssignee && a.status === 'pending' && !a.queued && !paused && (
             <Button type='primary' size='small' onClick={() => onDo(a)}>
               {(task.proof ?? 'attestation') === 'attestation'
                 ? 'I did it'
@@ -128,11 +147,22 @@ function TaskCard({
               Review
             </Button>
           )}
-          {you.canAssign && a.status === 'pending' && !paused && (
+          {you.canAssign && a.queued && a.status === 'pending' && !paused && (
+            <Popconfirm
+              title='Start this now?'
+              description='It becomes a task to do straight away.'
+              onConfirm={() => onAct(api.startConsequence, a)}
+            >
+              <Button type='primary' size='small'>
+                Start now
+              </Button>
+            </Popconfirm>
+          )}
+          {you.canAssign && a.status === 'pending' && !a.queued && !paused && (
             <Popconfirm
               title='Mark this as not done?'
-              description='It is just a record - nothing else changes.'
-              onConfirm={() => onAct(api.notDone, a)}
+              description='It is just a record - nothing else changes. You can add a consequence afterwards if you choose.'
+              onConfirm={() => onNotDone(a)}
             >
               <Button size='small'>Mark not done</Button>
             </Popconfirm>
@@ -141,11 +171,13 @@ function TaskCard({
             ['pending', 'submitted'].includes(a.status) &&
             !paused && (
               <Popconfirm
-                title='Cancel this task?'
+                title={
+                  a.queued ? 'Remove this from the queue?' : 'Cancel this task?'
+                }
                 onConfirm={() => onAct(api.cancel, a)}
               >
                 <Button size='small' danger>
-                  Cancel
+                  {a.queued ? 'Remove' : 'Cancel'}
                 </Button>
               </Popconfirm>
             )}
@@ -200,6 +232,8 @@ export default function TaskList({ dynamicId, paused, mode = 'all' }) {
   const [assigning, setAssigning] = React.useState(false);
   const [doing, setDoing] = React.useState(null);
   const [reviewing, setReviewing] = React.useState(null);
+  const [offer, setOffer] = React.useState(null); // a task just marked not done
+  const [consequence, setConsequence] = React.useState(null);
 
   const load = () =>
     api
@@ -216,14 +250,19 @@ export default function TaskList({ dynamicId, paused, mode = 'all' }) {
   const { you, assignments, dynamic } = data;
   const solo = dynamic.kind === 'solo';
   const reviewing_ = mode === 'review';
+  const queue = assignments.filter((a) => a.queued && a.status === 'pending');
   const open = assignments.filter((a) =>
     reviewing_
       ? a.status === 'submitted'
-      : ['pending', 'submitted'].includes(a.status),
+      : mode === 'consequences'
+        ? false
+        : !a.queued && ['pending', 'submitted'].includes(a.status),
   );
-  const finished = reviewing_
-    ? []
-    : assignments.filter((a) => !['pending', 'submitted'].includes(a.status));
+  const finished =
+    reviewing_ || mode === 'consequences'
+      ? []
+      : assignments.filter((a) => !['pending', 'submitted'].includes(a.status));
+  const titleOf = (id) => assignments.find((x) => x.id === id)?.task.task;
   // keep a modal pointed at the freshest copy (a timer's start, say)
   const fresh = (a) => assignments.find((x) => x.id === a?.id) ?? a;
 
@@ -244,6 +283,16 @@ export default function TaskList({ dynamicId, paused, mode = 'all' }) {
       onDo={setDoing}
       onReview={setReviewing}
       onAct={act}
+      onNotDone={(x) =>
+        api
+          .notDone(dynamicId, x.id)
+          .then(() => {
+            load();
+            setOffer(x);
+          })
+          .catch((e) => message.error(errorMessage(e)))
+      }
+      originalTitle={titleOf(a.consequenceFor)}
     />
   );
 
@@ -269,7 +318,22 @@ export default function TaskList({ dynamicId, paused, mode = 'all' }) {
         />
       )}
 
-      {open.length === 0 ? (
+      {mode === 'consequences' && (
+        <Typography.Paragraph type='secondary' style={{ maxWidth: 640 }}>
+          Consequences are tasks {you.canAssign ? 'you' : controllerAlias} chose
+          to add after something was marked not done. Nothing is added
+          automatically, both of you can see the queue, and they&rsquo;re
+          started one at a time when the time is right.
+        </Typography.Paragraph>
+      )}
+
+      {mode === 'consequences' ? (
+        queue.length === 0 ? (
+          <Empty description='No consequences are queued.' />
+        ) : (
+          queue.map(card)
+        )
+      ) : open.length === 0 ? (
         <Empty
           description={
             reviewing_
@@ -281,6 +345,15 @@ export default function TaskList({ dynamicId, paused, mode = 'all' }) {
         />
       ) : (
         open.map(card)
+      )}
+
+      {!reviewing_ && mode !== 'consequences' && queue.length > 0 && (
+        <>
+          <Typography.Title level={5} style={{ marginTop: 24 }}>
+            Queued consequences ({queue.length})
+          </Typography.Title>
+          {queue.map(card)}
+        </>
       )}
 
       {finished.length > 0 && (
@@ -303,6 +376,41 @@ export default function TaskList({ dynamicId, paused, mode = 'all' }) {
         partner={you.partner}
         open={assigning}
         onClose={() => setAssigning(false)}
+        onAssigned={load}
+      />
+      <Modal
+        open={!!offer}
+        title={`Add a consequence for \u201c${offer?.task.task}\u201d?`}
+        onCancel={() => setOffer(null)}
+        footer={[
+          <Button key='no' onClick={() => setOffer(null)}>
+            No, leave it
+          </Button>,
+          <Button
+            key='yes'
+            type='primary'
+            onClick={() => {
+              setConsequence(offer);
+              setOffer(null);
+            }}
+          >
+            Add a consequence
+          </Button>,
+        ]}
+      >
+        <Typography.Paragraph>
+          It&rsquo;s marked as not done. If you want, you can choose a task to
+          follow it. It goes in the consequences queue, where you both can see
+          it, and nothing happens until you start it.
+        </Typography.Paragraph>
+      </Modal>
+      <AssignTaskModal
+        dynamicId={dynamicId}
+        kind={solo ? 'solo' : 'pair'}
+        partner={you.partner}
+        open={!!consequence}
+        consequenceFor={consequence}
+        onClose={() => setConsequence(null)}
         onAssigned={load}
       />
       <CompleteTaskModal

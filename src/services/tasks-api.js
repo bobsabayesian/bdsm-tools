@@ -26,6 +26,8 @@ const uploadMedia = (id, aid, file) =>
     .then((res) => res.data);
 const review = (id, aid, approve, note) =>
   call('post', `/${id}/tasks/${aid}/review`, { approve, note });
+const startConsequence = (id, aid, dueAt) =>
+  call('post', `/${id}/tasks/${aid}/start-consequence`, { dueAt });
 const cancel = (id, aid) => call('post', `/${id}/tasks/${aid}/cancel`, {});
 const notDone = (id, aid) => call('post', `/${id}/tasks/${aid}/not-done`, {});
 
@@ -42,6 +44,7 @@ const comment = (id, target, body) =>
   call('post', `/${id}/comments`, { target, body });
 
 export default {
+  startConsequence,
   retention,
   mediaUrl,
   uploadMedia,

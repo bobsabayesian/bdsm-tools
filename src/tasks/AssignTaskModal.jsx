@@ -47,6 +47,7 @@ export default function AssignTaskModal({
   open,
   onClose,
   onAssigned,
+  consequenceFor,
 }) {
   const { message } = App.useApp();
   const [form] = Form.useForm();
@@ -168,10 +169,13 @@ export default function AssignTaskModal({
         dueAt: dueInstant(dueMode, dueDate, dueTime),
         retentionDays: keepDays ?? undefined,
         requiresReview: kind === 'pair' ? review : false,
+        consequenceFor: consequenceFor?.id,
         attested,
       });
       setAttest(null);
-      message.success('Task assigned');
+      message.success(
+        consequenceFor ? 'Added to the consequences queue' : 'Task assigned',
+      );
       onAssigned();
       onClose();
     } catch (e) {
@@ -221,9 +225,11 @@ export default function AssignTaskModal({
       <Modal
         open={open}
         title={
-          kind === 'solo'
-            ? 'Assign myself a task'
-            : `Assign a task to ${partner}`
+          consequenceFor
+            ? `Add a consequence for \u201c${consequenceFor.task.task}\u201d`
+            : kind === 'solo'
+              ? 'Assign myself a task'
+              : `Assign a task to ${partner}`
         }
         width={760}
         onCancel={onClose}
@@ -252,6 +258,14 @@ export default function AssignTaskModal({
           />
         ) : (
           <Space orientation='vertical' size='middle' style={{ width: '100%' }}>
+            {consequenceFor && (
+              <Alert
+                type='info'
+                showIcon
+                title='It waits in the queue until you start it'
+                description={`${partner ?? 'They'} can see it there. Nothing happens until you start it, and the same limits apply as for any task.`}
+              />
+            )}
             {error && <Alert type='error' title={error} />}
             <Tabs
               activeKey={tab}

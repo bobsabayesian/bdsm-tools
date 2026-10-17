@@ -52,6 +52,11 @@ export default function NavMenu({ vertical = false }) {
                 label: <Link to='/tasks/review'>To review</Link>,
               },
               {
+                key: 'consequences',
+                title: 'Consequences',
+                label: <Link to='/tasks/consequences'>Consequences</Link>,
+              },
+              {
                 key: 'mine',
                 title: 'My tasks',
                 label: <Link to='/tasks/mine'>My tasks</Link>,
