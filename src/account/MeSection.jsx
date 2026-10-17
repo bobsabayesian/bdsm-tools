@@ -9,6 +9,7 @@ import {
   Spin,
   Typography,
 } from 'antd';
+import { PROOF_LABELS } from './retention';
 import SaveActions from './SaveActions';
 import { scrollToTop } from '../util';
 import useCatalog from '../hooks/useCatalog';
@@ -31,6 +32,7 @@ const normalise = (me) =>
     me.pronouns,
     me.about.trim(),
     me.ruleChangeMinDays,
+    me.dataRetention,
   ]);
 
 /**
@@ -199,6 +201,41 @@ export default function MeSection({ onDirty }) {
               }
             />
             <Typography.Text>days</Typography.Text>
+          </Space>
+        </div>
+
+        <div>
+          <Typography.Text strong>Data retention</Typography.Text>
+          <Typography.Paragraph type='secondary' style={{ margin: 0 }}>
+            When you submit something for a task, the person who assigned it can
+            see it for this many days, depending on the kind of proof. After
+            that it is hidden from them, and a few days later removed altogether
+            (never sooner than a week, so nothing disappears by accident). You
+            always see your own. The shortest is 1 day, and changes only apply
+            to tasks assigned after you make them.
+          </Typography.Paragraph>
+          <Space orientation='vertical' size={4} style={{ marginTop: 4 }}>
+            {Object.entries(PROOF_LABELS).map(([kind, label]) => (
+              <Space key={kind}>
+                <InputNumber
+                  min={1}
+                  max={365}
+                  precision={0}
+                  aria-label={`${label} (days)`}
+                  value={me.dataRetention[kind]}
+                  onChange={(value) =>
+                    setMe({
+                      ...me,
+                      dataRetention: {
+                        ...me.dataRetention,
+                        [kind]: value ?? 1,
+                      },
+                    })
+                  }
+                />
+                <Typography.Text>days &mdash; {label}</Typography.Text>
+              </Space>
+            ))}
           </Space>
         </div>
 

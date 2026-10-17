@@ -382,7 +382,7 @@ dynamics.get('/:id/profile', async (c) => {
 
   const partner = await db
     .prepare(
-      `SELECT u.id, u.profile_shared_at, u.profile_steps, u.rule_change_min_days
+      `SELECT u.id, u.profile_shared_at, u.profile_steps, u.rule_change_min_days, u.data_retention
        FROM dynamic_members m JOIN users u ON u.id = m.user_id
        WHERE m.dynamic_id = ? AND m.user_id != ? AND u.deleted_at IS NULL`,
     )
@@ -408,7 +408,12 @@ dynamics.get('/:id/profile', async (c) => {
   return c.json({
     shared: true,
     steps: JSON.parse(partner.profile_steps),
-    me: readAbout(aboutRow, partner.rule_change_min_days),
+    me: readAbout(
+      aboutRow,
+      partner.rule_change_min_days,
+      undefined,
+      partner.data_retention,
+    ),
     selections: {
       bodyParts: results
         .filter((row) => row.catalog === 'bodyParts')

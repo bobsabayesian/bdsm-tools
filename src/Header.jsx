@@ -46,7 +46,7 @@ export default function Header() {
     <Affix offsetTop={0}>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <PageHeader
-          title='BDSM Tools'
+          title='The Compliance Ledger'
           onBack={pathname !== '/' ? back : undefined}
           tags={<Tag color='red'>{process.env.VERSION}</Tag>}
           avatar={{ icon: <DeploymentUnitOutlined /> }}

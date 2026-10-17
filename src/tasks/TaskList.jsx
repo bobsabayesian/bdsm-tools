@@ -103,6 +103,13 @@ function TaskCard({
             <ResponseSummary task={task} response={a.response} />
           </div>
         )}
+        {a.responseGone && (
+          <Typography.Text type='secondary'>
+            {a.responseGone === 'hidden'
+              ? `What was submitted is no longer shown (kept for ${a.retentionDays} ${a.retentionDays === 1 ? 'day' : 'days'}, as chosen by the person who did it).`
+              : 'What was submitted has been removed.'}
+          </Typography.Text>
+        )}
         {a.feedback && a.status === 'done' && (
           <Typography.Text type='secondary'>Note: {a.feedback}</Typography.Text>
         )}

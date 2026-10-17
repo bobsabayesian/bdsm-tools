@@ -6,6 +6,7 @@ import { dynamics } from './routes/dynamics';
 import { dynamicWork } from './routes/work';
 import { featureFlags } from './routes/feature-flags';
 import { profile } from './routes/profile';
+import { purgeExpired } from './retention';
 import { sceneNegotiation } from './routes/scene-negotiation';
 
 // Static files (the React app) are served by Cloudflare directly; this Worker
@@ -28,4 +29,10 @@ app.onError((err, c) => {
   return c.json({ error: 'Internal server error' }, 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // daily: remove submissions that are past their retention days
+  scheduled: (event, env, ctx) => {
+    ctx.waitUntil(purgeExpired(env.DB));
+  },
+};

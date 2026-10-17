@@ -17,7 +17,7 @@ export default function UpdateChecker() {
       notification.warning({
         message: 'New version available',
         description: `
-          You're using an old version of BDSM Tools. Not updating may cause 
+          You're using an old version of The Compliance Ledger. Not updating may cause 
           unknown errors to occur. Plus, it means there's probably new features
           you're missing out on.
         `,

@@ -10,6 +10,7 @@ import {
   parseQuiz,
   SUPPORTED_PROOFS,
 } from '../tasks';
+import { daysFor, parsePolicy, visibility } from '../retention';
 import { getDoc, listDocs } from '../docs';
 import { resumeDuePauses } from './dynamics';
 
@@ -127,27 +128,39 @@ const forViewer = (task, m) =>
     ? { ...task, questions: parseQuiz(task.questions).map((q) => q.question) }
     : task;
 
-const presentAssignment = (row, m, counts) => ({
-  id: row.id,
-  status: row.status,
-  overdue:
-    row.status === 'pending' &&
-    !!row.due_at &&
-    row.due_at < new Date().toISOString() &&
-    m.status === 'active',
-  task: forViewer(JSON.parse(row.task), m),
-  dueAt: row.due_at,
-  requiresReview: !!row.requires_review,
-  attestedSoftLimits: JSON.parse(row.attested_soft_limits),
-  startedAt: row.started_at,
-  response: row.response ? JSON.parse(row.response) : null,
-  feedback: row.feedback,
-  createdAt: row.created_at,
-  submittedAt: row.submitted_at,
-  completedAt: row.completed_at,
-  reviewedAt: row.reviewed_at,
-  comments: counts.get(`assignment:${row.id}`) ?? 0,
-});
+const presentAssignment = (row, m, counts) => {
+  // what is left of a submission once the doer's retention days have passed
+  const shown = visibility({
+    submittedAt: row.submitted_at,
+    days: row.retention_days,
+    isOwner: row.assigned_to === m.me.user_id,
+  });
+  return {
+    id: row.id,
+    status: row.status,
+    overdue:
+      row.status === 'pending' &&
+      !!row.due_at &&
+      row.due_at < new Date().toISOString() &&
+      m.status === 'active',
+    task: forViewer(JSON.parse(row.task), m),
+    dueAt: row.due_at,
+    requiresReview: !!row.requires_review,
+    attestedSoftLimits: JSON.parse(row.attested_soft_limits),
+    startedAt: row.started_at,
+    response:
+      row.response && shown === 'visible' ? JSON.parse(row.response) : null,
+    // why a submission can't be seen: 'hidden' (the doer's days have passed) or 'deleted'
+    responseGone: shown === 'visible' ? null : shown,
+    retentionDays: row.retention_days,
+    feedback: row.feedback,
+    createdAt: row.created_at,
+    submittedAt: row.submitted_at,
+    completedAt: row.completed_at,
+    reviewedAt: row.reviewed_at,
+    comments: counts.get(`assignment:${row.id}`) ?? 0,
+  };
+};
 
 const commentCounts = async (db, dynamicId) => {
   const { results } = await db
@@ -345,11 +358,20 @@ dynamicWork.post('/:id/tasks', async (c) => {
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+  // the doer's policy for this kind of proof, kept with the task from now on
+  const policy = parsePolicy(
+    (
+      await db
+        .prepare('SELECT data_retention FROM users WHERE id = ?')
+        .bind(m.assignee.user_id)
+        .first()
+    )?.data_retention,
+  );
   await db
     .prepare(
       `INSERT INTO assignments (id, dynamic_id, assigned_by, assigned_to, template_id, task, status,
-         requires_review, due_at, attested_soft_limits, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+         requires_review, due_at, attested_soft_limits, created_at, retention_days)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -362,6 +384,7 @@ dynamicWork.post('/:id/tasks', async (c) => {
       due,
       JSON.stringify(m.kind === 'solo' ? [] : verdict.attested),
       now,
+      daysFor(policy, task.proof),
     )
     .run();
 

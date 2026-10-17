@@ -32,15 +32,6 @@ export default function Faq() {
         {/*    </Typography.Paragraph>*/}
         {/*  </Typography>*/}
         {/*</Collapse.Panel>*/}
-        <Collapse.Panel key='4' header='Why are there so few tools available?'>
-          <Typography>
-            <Typography.Paragraph>
-              Unfortunately it's because I am only doing this in my spare time.
-              Plus it's hard to think of new ideas. If you have an idea, please
-              contact me by raising an issue here: <IssueLink />
-            </Typography.Paragraph>
-          </Typography>
-        </Collapse.Panel>
       </Collapse>
     </React.Fragment>
   );

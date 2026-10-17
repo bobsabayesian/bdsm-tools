@@ -1,7 +1,7 @@
 {
   "name": "bdsm-tools",
   "version": "1.5.2",
-  "description": "BDSM Tools Web Application",
+  "description": "The Compliance Ledger",
   "main": "index.js",
   "scripts": {
     "dev:api": "wrangler dev --port 8787",

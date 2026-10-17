@@ -1,6 +1,6 @@
-# BDSM Tools
+# The Compliance Ledger
 
-This is the codebase for the BDSM Tools Application containing various tools for BDSM
+This is the codebase for the Compliance Ledger application containing various tools for BDSM
 practitioners: a React Single Page Application and a Cloudflare Worker API.
 
 ## Architecture

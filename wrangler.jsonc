@@ -26,5 +26,9 @@
 			"database_id": "bcc66e40-7838-46fa-9e63-0742768c53e1"
 		},
 	],
+	// Daily clean-up of submissions past their retention days
+	"triggers": {
+		"crons": ["17 3 * * *"]
+	},
 	// Secret: ADMIN_TOKEN (set with `npx wrangler secret put ADMIN_TOKEN`)
 }

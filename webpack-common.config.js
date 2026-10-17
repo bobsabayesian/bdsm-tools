@@ -162,7 +162,7 @@ module.exports = {
 
   plugins: [
     new HtmlWebpackPlugin({
-      title: 'BDSM Tools',
+      title: 'The Compliance Ledger',
       favicon: 'favicon.ico',
       base: '/',
     }),

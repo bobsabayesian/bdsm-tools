@@ -9,11 +9,9 @@ export default function Home() {
   return (
     <div style={{ marginTop: 30 }}>
       <Typography>
-        <Typography.Title level={2}>BDSM Tools</Typography.Title>
+        <Typography.Title level={2}>The Compliance Ledger</Typography.Title>
         <Typography.Paragraph style={{ maxWidth: 500 }}>
-          This is a site with a bunch of tools for people who enjoy BDSM.
-          Unfortunately there are limited tools available, please get in touch
-          if you have any ideas for more.
+          Manage your dynamic.
         </Typography.Paragraph>
       </Typography>
       <Divider orientation='left' style={{ marginTop: 50 }}>

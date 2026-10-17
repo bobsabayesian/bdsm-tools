@@ -1,4 +1,5 @@
 import React from 'react';
+import { PROOF_LABELS } from './retention';
 import { Card, Space, Spin, Table, Tabs, Tag, Typography } from 'antd';
 import useCatalog from '../hooks/useCatalog';
 import api from '../services/account-api';
@@ -210,6 +211,17 @@ export default function PartnerProfile({ dynamic }) {
               {me.ruleChangeMinDays}{' '}
               {me.ruleChangeMinDays === 1 ? 'day' : 'days'}
             </Tag>
+          </div>
+          <div>
+            <Typography.Text type='secondary'>
+              {partner.name} lets you see what they submit for:{' '}
+            </Typography.Text>
+            {Object.entries(PROOF_LABELS).map(([kind, label]) => (
+              <Tag key={kind}>
+                {label}: {me.dataRetention[kind]}{' '}
+                {me.dataRetention[kind] === 1 ? 'day' : 'days'}
+              </Tag>
+            ))}
           </div>
         </Space>
       ),

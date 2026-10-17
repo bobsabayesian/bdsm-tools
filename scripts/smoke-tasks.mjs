@@ -354,6 +354,42 @@ assert.equal(
   'not twice',
 );
 
+step(
+  'data retention: the sub chooses, per kind of proof, how long the dom sees it',
+);
+assert.equal(done.json.retentionDays, 30, 'the default is 30 days');
+const mine = (await sub.call('GET', '/profile')).json.me;
+const saveRetention = (dataRetention) =>
+  sub.call('PUT', '/profile/me', { ...mine, dataRetention });
+assert.equal(
+  (await saveRetention({ attestation: 0 })).status,
+  400,
+  'at least 1 day',
+);
+assert.equal((await saveRetention({ attestation: 400 })).status, 400);
+assert.equal((await saveRetention({ nonsense: 5 })).status, 400);
+assert.equal((await saveRetention({ attestation: 3 })).status, 204);
+const myMe = (await sub.call('GET', '/profile')).json.me;
+assert.equal(myMe.dataRetention.attestation, 3);
+assert.equal(myMe.dataRetention.media, 30, 'others keep the default');
+const theirs = (await dom.call('GET', `${P}/profile`)).json.me;
+assert.equal(theirs.dataRetention.attestation, 3, 'the dom can see the policy');
+const kept = (await assign(lib.Kneel)).json;
+assert.equal(kept.retentionDays, 3, 'copied onto the task when assigned');
+await sub.call('POST', `${P}/tasks/${kept.id}/submit`, { response: {} });
+const keptSeen = (await dom.call('GET', `${P}/tasks`)).json.assignments.find(
+  (a) => a.id === kept.id,
+);
+assert.equal(keptSeen.retentionDays, 3);
+assert.equal(keptSeen.responseGone, null, 'still within its days');
+assert.equal(
+  (await sub.call('GET', `${P}/tasks`)).json.assignments.find(
+    (a) => a.id === done.json.id,
+  ).retentionDays,
+  30,
+  'an earlier task keeps the policy it had',
+);
+
 step("review is the dom's choice: send back, then approve");
 const reviewed = (await assign(lib.Kneel, { requiresReview: true })).json;
 assert.equal(reviewed.requiresReview, true);
