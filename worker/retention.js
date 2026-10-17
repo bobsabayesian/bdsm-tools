@@ -14,6 +14,7 @@ export const PROOF_KINDS = [
   'timer',
   'choice',
   'quiz',
+  'checkin',
   'location',
 ];
 export const DEFAULT_DAYS = 30;

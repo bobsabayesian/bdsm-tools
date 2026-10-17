@@ -8,5 +8,6 @@ export const PROOF_LABELS = {
   timer: 'Timer (hold)',
   choice: 'Choice (or permission)',
   quiz: 'Quiz / memorisation',
+  checkin: 'Time-stamped check-in',
   location: 'Location check-in',
 };

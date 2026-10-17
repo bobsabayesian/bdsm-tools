@@ -24,7 +24,7 @@ test('days fall back to the default, and a policy must be 1-365 whole days', () 
     media: 1,
     text: 9,
   });
-  assert.equal(Object.keys(fullPolicy({})).length, 9);
+  assert.equal(Object.keys(fullPolicy({})).length, 10);
 });
 
 test('deletion waits at least a week, or longer if the person chose more', () => {

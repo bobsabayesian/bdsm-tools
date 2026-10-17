@@ -241,7 +241,17 @@ assert.ok(fields.find((f) => f.name === 'task' && f.required));
 assert.ok(!fields.some((f) => f.name === 'category'));
 assert.deepEqual(
   fields.find((f) => f.name === 'proof').options.map((o) => o.value),
-  ['attestation', 'numeric', 'text', 'lines', 'timer', 'choice', 'quiz'],
+  [
+    'attestation',
+    'numeric',
+    'text',
+    'lines',
+    'timer',
+    'choice',
+    'quiz',
+    'checkin',
+    'location',
+  ],
 );
 assert.equal((await sub.call('GET', `${P}/task-fields`)).status, 403);
 
@@ -389,6 +399,47 @@ assert.equal(
   30,
   'an earlier task keeps the policy it had',
 );
+
+step('check-in and location proofs are recorded, never refused');
+const checkin = await dom.call('POST', `${P}/tasks`, {
+  task: { task: 'Check in on time', proof: 'checkin', graceMinutes: 1 },
+  dueAt: new Date(Date.now() - 4 * 60000).toISOString(),
+});
+assert.equal(checkin.status, 201);
+const checkedIn = await sub.call(
+  'POST',
+  `${P}/tasks/${checkin.json.id}/submit`,
+  {
+    response: {},
+  },
+);
+assert.equal(checkedIn.json.status, 'done');
+assert.ok(checkedIn.json.response.minutesLate >= 4, 'late is noted');
+const where = await dom.call('POST', `${P}/tasks`, {
+  task: {
+    task: 'Be at the gym',
+    proof: 'location',
+    place: 'the gym',
+    placeLat: 51.5007,
+    placeLng: -0.1246,
+    radiusMeters: 200,
+  },
+});
+assert.equal(where.status, 201);
+assert.equal(
+  (
+    await sub.call('POST', `${P}/tasks/${where.json.id}/submit`, {
+      response: {},
+    })
+  ).status,
+  422,
+  'nothing is shared until they choose to',
+);
+const shared = await sub.call('POST', `${P}/tasks/${where.json.id}/submit`, {
+  response: { lat: 51.51, lng: -0.1246, accuracy: 20 },
+});
+assert.equal(shared.json.status, 'done', 'being elsewhere is not refused');
+assert.equal(shared.json.response.withinRadius, false);
 
 step("review is the dom's choice: send back, then approve");
 const reviewed = (await assign(lib.Kneel, { requiresReview: true })).json;

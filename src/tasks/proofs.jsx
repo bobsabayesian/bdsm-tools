@@ -10,6 +10,7 @@ export const PROOF_LABEL = {
   timer: 'Timer',
   choice: 'Choose',
   quiz: 'Quiz',
+  checkin: 'Check in',
   location: 'Location',
 };
 
@@ -47,6 +48,30 @@ export function ResponseSummary({ task, response }) {
     case 'quiz':
       return (
         <Typography.Text>Answered every question correctly</Typography.Text>
+      );
+    case 'checkin':
+      return (
+        <Typography.Text>
+          Checked in {new Date(response.at).toLocaleString()}
+          {response.minutesLate > 0
+            ? ` - ${response.minutesLate} min late`
+            : ' - on time'}
+        </Typography.Text>
+      );
+    case 'location':
+      return (
+        <Typography.Text>
+          <Typography.Link
+            href={`https://www.openstreetmap.org/?mlat=${response.lat}&mlon=${response.lng}#map=17/${response.lat}/${response.lng}`}
+            target='_blank'
+            rel='noreferrer'
+          >
+            {response.lat}, {response.lng}
+          </Typography.Link>
+          {response.distanceMeters !== undefined &&
+            ` - ${response.distanceMeters} m from ${task.place ?? 'the place'}`}
+          {response.withinRadius === false && ' (outside the distance asked)'}
+        </Typography.Text>
       );
     default:
       return <Typography.Text>Marked as done</Typography.Text>;

@@ -64,6 +64,7 @@ const PROOF_TYPES = [
   { label: 'Timer (hold)', value: 'timer' },
   { label: 'Choice (or permission)', value: 'choice' },
   { label: 'Quiz / memorisation', value: 'quiz' },
+  { label: 'Time-stamped check-in', value: 'checkin' },
   { label: 'Location check-in', value: 'location' },
 ];
 
@@ -409,12 +410,29 @@ const catalogs = {
           { label: 'Any', value: 'any' },
         ],
       }),
+      forProof(['checkin'], {
+        name: 'graceMinutes',
+        label: 'Minutes of grace',
+        type: 'number',
+        help: 'Checking in later than the due time plus this is noted as late (never refused)',
+      }),
       forProof(['location'], {
         name: 'place',
         label: 'Place',
         type: 'string',
         required: true,
         help: 'e.g. "the gym"',
+      }),
+      forProof(['location'], {
+        name: 'placeLat',
+        label: 'Place latitude',
+        type: 'number',
+        help: 'Optional. With the longitude, how far away they were is noted',
+      }),
+      forProof(['location'], {
+        name: 'placeLng',
+        label: 'Place longitude',
+        type: 'number',
       }),
       forProof(['location'], {
         name: 'radiusMeters',

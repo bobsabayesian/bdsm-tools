@@ -105,7 +105,9 @@ export default function AssignTaskModal({
     const parts = [];
     for (const reason of a.reasons) {
       if (reason.code === 'proof')
-        parts.push('needs photo or location proof, which is not available yet');
+        parts.push(
+          'needs photo, video or audio proof, which is not available yet',
+        );
       if (reason.code === 'body-part')
         parts.push(
           `needs ${nameList(bodyParts, reason.keys)}, which ${partner} has not included`,

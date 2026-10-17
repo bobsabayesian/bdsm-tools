@@ -426,6 +426,7 @@ dynamicWork.post('/:id/tasks/:aid/submit', async (c) => {
   const result = checkResponse(JSON.parse(row.task), (await body(c)).response, {
     startedAt: row.started_at ? new Date(row.started_at).getTime() : undefined,
     now: Date.now(),
+    dueAt: row.due_at,
   });
   if (!result.ok)
     return c.json({ error: result.error, incorrect: result.incorrect }, 422);

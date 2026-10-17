@@ -2,8 +2,8 @@ import { assessAssignment } from './limits.js';
 
 /**
  * Pure rules about tasks in a dynamic: which can be assigned to whom, and how
- * a response is checked. (Photo/video/audio and location proofs need file
- * storage and location consent, so they are not available yet.)
+ * a response is checked. (Photo/video/audio proofs need file storage, so they
+ * are not available yet.)
  */
 
 export const SUPPORTED_PROOFS = [
@@ -14,6 +14,8 @@ export const SUPPORTED_PROOFS = [
   'timer',
   'choice',
   'quiz',
+  'checkin',
+  'location',
 ];
 
 const keysOf = (selections, catalog) =>
@@ -78,7 +80,25 @@ export const parseQuiz = (entries = []) =>
  * cleaned up for storing, or { ok: false, error } (quizzes also say which
  * answers were wrong, so they can try again).
  */
-export const checkResponse = (task, response = {}, { startedAt, now } = {}) => {
+const EARTH_METRES = 6371000;
+const radians = (degrees) => (degrees * Math.PI) / 180;
+/** Straight-line distance in metres between two coordinates */
+export const distanceMetres = (a, b) => {
+  const dLat = radians(b.lat - a.lat);
+  const dLng = radians(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(radians(a.lat)) *
+      Math.cos(radians(b.lat)) *
+      Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * EARTH_METRES * Math.asin(Math.sqrt(h)));
+};
+
+export const checkResponse = (
+  task,
+  response = {},
+  { startedAt, now, dueAt } = {},
+) => {
   switch (task.proof ?? 'attestation') {
     case 'attestation':
       return { ok: true, response: { done: true } };
@@ -170,6 +190,50 @@ export const checkResponse = (task, response = {}, { startedAt, now } = {}) => {
         ok: true,
         response: { answers: answers.map((a) => String(a).trim()) },
       };
+    }
+
+    // A check-in is recorded with the time the server saw it. Being late is
+    // noted for the other person to see, never refused.
+    case 'checkin': {
+      const due = dueAt ? new Date(dueAt).getTime() : null;
+      const grace = (task.graceMinutes ?? 0) * 60000;
+      const late =
+        due !== null && now > due + grace ? Math.ceil((now - due) / 60000) : 0;
+      return {
+        ok: true,
+        response: { at: new Date(now).toISOString(), minutesLate: late },
+      };
+    }
+
+    // Where they said they were - only shared when they choose to, and
+    // measured against the place if the task gave coordinates. Being elsewhere
+    // is noted, never refused.
+    case 'location': {
+      const lat = response.lat;
+      const lng = response.lng;
+      if (
+        typeof lat !== 'number' ||
+        typeof lng !== 'number' ||
+        !(Math.abs(lat) <= 90) ||
+        !(Math.abs(lng) <= 180)
+      ) {
+        return { ok: false, error: 'Share your location to check in' };
+      }
+      const round = (n) => Math.round(n * 1e5) / 1e5;
+      const out = { lat: round(lat), lng: round(lng) };
+      if (Number.isFinite(response.accuracy)) {
+        out.accuracy = Math.round(response.accuracy);
+      }
+      if (Number.isFinite(task.placeLat) && Number.isFinite(task.placeLng)) {
+        out.distanceMeters = distanceMetres(out, {
+          lat: task.placeLat,
+          lng: task.placeLng,
+        });
+        if (Number.isFinite(task.radiusMeters)) {
+          out.withinRadius = out.distanceMeters <= task.radiusMeters;
+        }
+      }
+      return { ok: true, response: out };
     }
 
     default:

@@ -52,9 +52,10 @@ test('hard limits make a task unavailable; soft limits are flagged but do not', 
   assert.deepEqual(soft.softLimits, [{ key: 'rope', direction: 'receive' }]);
 });
 
-test('photo and location tasks cannot be assigned yet', () => {
+test('photo, video and audio tasks cannot be assigned yet', () => {
   assert.equal(availability({ proof: 'media' }, []).assignable, false);
-  assert.equal(availability({ proof: 'location' }, []).assignable, false);
+  assert.equal(availability({ proof: 'location' }, []).assignable, true);
+  assert.equal(availability({ proof: 'checkin' }, []).assignable, true);
   assert.equal(availability({ proof: 'timer' }, []).assignable, true);
 });
 
@@ -182,5 +183,56 @@ test("My Body and What's in bounds? are separate lists", () => {
     availability({ requiresBodyPart: ['feet'] }, [sel('boundsBody', 'feet')])
       .assignable,
     false,
+  );
+});
+
+test('check-ins note lateness and locations note distance, and neither is refused', () => {
+  const due = '2026-10-20T12:00:00.000Z';
+  const at = (minutes) => Date.parse(due) + minutes * 60000;
+  const checkin = { proof: 'checkin', graceMinutes: 5 };
+  assert.equal(
+    checkResponse(checkin, {}, { now: at(-10), dueAt: due }).response
+      .minutesLate,
+    0,
+  );
+  assert.equal(
+    checkResponse(checkin, {}, { now: at(5), dueAt: due }).response.minutesLate,
+    0,
+    'within the grace',
+  );
+  const late = checkResponse(checkin, {}, { now: at(20), dueAt: due });
+  assert.equal(late.ok, true);
+  assert.equal(late.response.minutesLate, 20);
+  assert.equal(
+    checkResponse(checkin, {}, { now: at(20) }).response.minutesLate,
+    0,
+    'no due time, nothing to be late for',
+  );
+
+  const place = {
+    proof: 'location',
+    placeLat: 51.5007,
+    placeLng: -0.1246,
+    radiusMeters: 200,
+  };
+  assert.equal(checkResponse(place, {}).ok, false, 'nothing shared');
+  assert.equal(checkResponse(place, { lat: 99, lng: 0 }).ok, false);
+  const near = checkResponse(place, {
+    lat: 51.5008,
+    lng: -0.1247,
+    accuracy: 12.4,
+  });
+  assert.equal(near.ok, true);
+  assert.equal(near.response.withinRadius, true);
+  assert.equal(near.response.accuracy, 12);
+  const far = checkResponse(place, { lat: 51.51, lng: -0.1246 });
+  assert.equal(far.ok, true, 'being elsewhere is noted, not refused');
+  assert.equal(far.response.withinRadius, false);
+  assert.ok(far.response.distanceMeters > 900);
+  assert.equal(
+    checkResponse({ proof: 'location' }, { lat: 1, lng: 2 }).response
+      .distanceMeters,
+    undefined,
+    'no place given: just where they are',
   );
 });

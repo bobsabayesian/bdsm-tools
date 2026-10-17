@@ -85,6 +85,8 @@ export default function CompleteTaskModal({
   const started = proof === 'timer' && assignment.startedAt;
   const canSubmit = {
     attestation: true,
+    checkin: true,
+    location: typeof response.lat === 'number',
     numeric: typeof response.value === 'number',
     text: !!response.text?.trim(),
     lines: !!response.text?.trim(),
@@ -203,6 +205,48 @@ export default function CompleteTaskModal({
               </Button>
             </>
           ))}
+
+        {proof === 'checkin' && (
+          <Typography.Paragraph>
+            Checking in records the time you press the button.
+            {assignment.dueAt &&
+              ` It is due ${new Date(assignment.dueAt).toLocaleString()}; checking in later is noted, not refused.`}
+          </Typography.Paragraph>
+        )}
+
+        {proof === 'location' && (
+          <>
+            <Typography.Paragraph>
+              {task.place ? `Check in at ${task.place}. ` : ''}
+              Your location is only shared when you press the button, and only
+              with the person who assigned this.
+            </Typography.Paragraph>
+            <Button
+              onClick={() =>
+                navigator.geolocation
+                  ? navigator.geolocation.getCurrentPosition(
+                      ({ coords }) => {
+                        setError(null);
+                        setResponse({
+                          lat: coords.latitude,
+                          lng: coords.longitude,
+                          accuracy: coords.accuracy,
+                        });
+                      },
+                      () =>
+                        setError(
+                          'Could not get your location. Check that your browser is allowed to share it.',
+                        ),
+                    )
+                  : setError('Your browser cannot share its location')
+              }
+            >
+              {typeof response.lat === 'number'
+                ? 'Location ready - share again to refresh'
+                : 'Share my location'}
+            </Button>
+          </>
+        )}
 
         {proof === 'choice' && (
           <Radio.Group
