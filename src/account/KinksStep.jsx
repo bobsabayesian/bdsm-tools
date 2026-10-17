@@ -291,7 +291,7 @@ export default function KinksStep({ onDone, embedded = false, onDirty }) {
         <Alert
           type='info'
           showIcon
-          title='Kinks are what you like; on the table is what you have'
+          title='Kinks are what you like; in bounds is what you have'
           description={
             <>
               This page is how you <b>feel</b> about things.{' '}
@@ -303,7 +303,7 @@ export default function KinksStep({ onDone, embedded = false, onDirty }) {
                   one)
                 </>
               )}{' '}
-              is what&rsquo;s <b>on the table</b> &mdash; what you have and are
+              is what&rsquo;s <b>in bounds</b> &mdash; what you have and are
               willing to use. Some things, like gags, blindfolds and rope, show
               up in both. That&rsquo;s deliberate: it&rsquo;s better to say it
               twice. Tasks check each list on its own.

@@ -137,7 +137,7 @@ kept on the kinks as labels: Giving / Receiving, **As Dominant / As submissive**
 **As actor / As subject**, or **Partner / Self** for the fantasy sections. Themes with no sides (groupings,
 taboo themes, fluids) have **one answer**. Choices are shared with partners like the rest of the profile.
 
-**Kinks are what you like; "What's in bounds?" is what's on the table** (what you have and are willing to use).
+**Kinks are what you like; "What's in bounds?" is what you have** (and are willing to use).
 Some things - gags, blindfolds, rope - are in both on purpose, and the kinks page says so at the top. Tasks check
 each list on its own.
 
