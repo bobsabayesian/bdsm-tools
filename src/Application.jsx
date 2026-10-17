@@ -140,7 +140,11 @@ function AppLayout() {
         algorithm: theme.darkAlgorithm,
         token: {
           colorPrimary: '#d71616',
-          colorLink: '#d71616',
+          colorLink: '#e8e8e8',
+          colorLinkHover: '#ffffff',
+          colorError: '#f0803c',
+          colorTextSecondary: 'rgba(255, 255, 255, 0.7)',
+          colorTextTertiary: 'rgba(255, 255, 255, 0.58)',
           colorBgLayout: '#1f1f1f',
           colorBgContainer: '#262626',
           colorBorder: '#3a3a3a',

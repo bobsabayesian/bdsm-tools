@@ -12,6 +12,7 @@ import {
   Radio,
   Space,
   Spin,
+  Tooltip,
   Typography,
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
@@ -278,6 +279,9 @@ export default function Dynamics({ displayName = '' }) {
   const open = (dynamic) => navigate(`/account/dynamics/${dynamic.id}`);
   const current = (dynamics ?? []).filter((d) => d.status !== 'ended');
   const ended = (dynamics ?? []).filter((d) => d.status === 'ended');
+  const soloExists = (dynamics ?? []).some(
+    (d) => d.kind === 'solo' && d.status !== 'ended',
+  );
 
   return (
     <section id='dynamics'>
@@ -285,32 +289,59 @@ export default function Dynamics({ displayName = '' }) {
         My dynamics
       </Typography.Title>
       <Space wrap style={{ marginBottom: 24 }}>
-        <Button
-          type='primary'
-          disabled={!displayName}
-          onClick={() => setInviting(true)}
-        >
-          Invite someone
-        </Button>
-        <Button disabled={!displayName} onClick={() => setJoining(true)}>
-          Join with a code
-        </Button>
-        <Button
-          disabled={
-            !displayName ||
-            (dynamics ?? []).some(
-              (d) => d.kind === 'solo' && d.status !== 'ended',
-            )
-          }
-          onClick={() =>
-            api
-              .startSolo(displayName)
-              .then(open)
-              .catch((e) => message.error(errorMessage(e)))
+        <Tooltip
+          title={
+            displayName
+              ? 'Make a one-time code to give your partner (it expires in 7 days). You choose whether you are the dominant or the submissive; they get the other role.'
+              : 'Add your display name first (Edit my profile, then Me).'
           }
         >
-          Start on my own
-        </Button>
+          <span>
+            <Button
+              type='primary'
+              disabled={!displayName}
+              onClick={() => setInviting(true)}
+            >
+              Invite someone
+            </Button>
+          </span>
+        </Tooltip>
+        <Tooltip
+          title={
+            displayName
+              ? 'Enter a code your partner gave you to join the dynamic they started.'
+              : 'Add your display name first (Edit my profile, then Me).'
+          }
+        >
+          <span>
+            <Button disabled={!displayName} onClick={() => setJoining(true)}>
+              Join with a code
+            </Button>
+          </span>
+        </Tooltip>
+        <Tooltip
+          title={
+            !displayName
+              ? 'Add your display name first (Edit my profile, then Me).'
+              : soloExists
+                ? 'You already have a solo dynamic.'
+                : 'Just you: you assign yourself tasks and keep your own ledger. Nobody else sees it, and you can start a dynamic with someone later.'
+          }
+        >
+          <span>
+            <Button
+              disabled={!displayName || soloExists}
+              onClick={() =>
+                api
+                  .startSolo(displayName)
+                  .then(open)
+                  .catch((e) => message.error(errorMessage(e)))
+              }
+            >
+              Start on my own
+            </Button>
+          </span>
+        </Tooltip>
       </Space>
 
       {dynamics === null ? (

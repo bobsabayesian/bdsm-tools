@@ -57,3 +57,12 @@ test('keys are lower-cased and checked', () => {
   );
   assert.ok(validate(genders, { key: '!!', label: 'x' }).errors);
 });
+
+test('a message needs text and a topic from the list; status starts as new', () => {
+  const message = (body) => validate(catalogs.messages, body);
+  assert.deepEqual(message({}).errors, ['Message is required']);
+  const ok = message({ topic: 'question', message: 'Hello there' });
+  assert.equal(ok.value.status, 'new');
+  assert.deepEqual(ok.errors, undefined);
+  assert.ok(message({ topic: 'spam', message: 'x' }).errors);
+});

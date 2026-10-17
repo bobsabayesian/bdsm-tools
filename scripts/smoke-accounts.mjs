@@ -375,6 +375,25 @@ assert.deepEqual(
 );
 
 step('the Me tab: optional details, validated, never required');
+// what a person has said about retention, task types and required task fields
+const preferenceDefaults = {
+  dataRetention: Object.fromEntries(
+    [
+      'attestation',
+      'media',
+      'numeric',
+      'text',
+      'lines',
+      'timer',
+      'choice',
+      'quiz',
+      'checkin',
+      'location',
+    ].map((kind) => [kind, 30]),
+  ),
+  unwillingTaskTypes: [],
+  requiredTaskFields: [],
+};
 profile = (await b.call('GET', '/profile')).json;
 assert.deepEqual(profile.me, {
   genders: [],
@@ -382,6 +401,7 @@ assert.deepEqual(profile.me, {
   about: '',
   ruleChangeMinDays: 7,
   displayName: 'Bob',
+  ...preferenceDefaults,
 });
 assert.equal(
   (await b.call('PUT', '/profile/me', { genders: ['nonsense'] })).status,
@@ -416,6 +436,7 @@ assert.deepEqual((await b.call('GET', '/profile')).json.me, {
   about: 'I like a plan.',
   ruleChangeMinDays: 7,
   displayName: 'Bob',
+  ...preferenceDefaults,
 });
 assert.equal(
   (await b.call('PUT', '/profile/me', {})).status,
@@ -903,6 +924,7 @@ assert.deepEqual(
     pronouns: ['they/them'],
     about: 'I like a plan.',
     ruleChangeMinDays: 7,
+    ...preferenceDefaults,
   },
   'and so are the Me details',
 );
@@ -1064,6 +1086,89 @@ assert.equal(
     })
   ).status,
   401,
+);
+
+step('the contact form: anyone can write, and the admin tool can read it');
+const visitor = new Person('visitor');
+const msg = (extra = {}) => ({
+  topic: 'question',
+  message: 'Hello, is this real?',
+  ...extra,
+});
+assert.equal((await visitor.call('POST', '/contact', msg())).status, 201);
+assert.equal(
+  (await visitor.call('POST', '/contact', { topic: 'question', message: '' }))
+    .status,
+  400,
+);
+assert.equal(
+  (
+    await visitor.call(
+      'POST',
+      '/contact',
+      msg({ website: 'http://spam', message: 'buy now' }),
+    )
+  ).status,
+  201,
+  'a bot is told it worked',
+);
+const writer = new Person('writer-contact');
+await writer.signup();
+assert.equal(
+  (
+    await writer.call(
+      'POST',
+      '/contact',
+      msg({
+        message: 'Please remove my data',
+        topic: 'data-request',
+        includeUsername: true,
+        replyTo: 'me@example.com',
+      }),
+    )
+  ).status,
+  201,
+);
+assert.equal(
+  (
+    await visitor.call(
+      'POST',
+      '/contact',
+      msg({
+        message: 'Not logged in, but asking for a username',
+        includeUsername: true,
+      }),
+    )
+  ).status,
+  201,
+);
+if (process.env.ADMIN_TOKEN) {
+  const res = await fetch(`${BASE}/api/admin/catalogs/messages/items`, {
+    headers: { authorization: `Bearer ${process.env.ADMIN_TOKEN}` },
+  });
+  const items = await res.json();
+  assert.equal(items.length, 3, 'the bot message was not kept');
+  assert.equal(
+    items[0].message,
+    'Not logged in, but asking for a username',
+    'newest first',
+  );
+  assert.equal(
+    items[0].username,
+    undefined,
+    'no username unless logged in and asked',
+  );
+  const mine = items.find((i) => i.message === 'Please remove my data');
+  assert.equal(mine.username, writer.name);
+  assert.equal(mine.replyTo, 'me@example.com');
+  assert.equal(mine.status, 'new');
+  assert.equal(mine.topic, 'data-request');
+}
+assert.equal((await visitor.call('POST', '/contact', msg())).status, 201);
+assert.equal(
+  (await visitor.call('POST', '/contact', msg())).status,
+  429,
+  'five an hour, then it asks you to wait',
 );
 
 step('login attempts are throttled');

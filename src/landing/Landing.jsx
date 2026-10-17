@@ -439,7 +439,7 @@ export default function Landing() {
           <Link to='/about/info'>About</Link>
         </nav>
         <span className='foot-right'>
-          2026 &middot; <Link to='/about/info'>Data policy</Link>
+          2026 &middot; <Link to='/about/info#data-policy'>Data policy</Link>
         </span>
       </footer>
     </div>

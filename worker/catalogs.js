@@ -55,6 +55,14 @@ const simpleCatalog = (title, collection, extraFields = [], options = {}) => ({
 
 // How a task is proven or logged. Each needs its own screen and validation,
 // so this list lives in code rather than being admin-editable.
+export const CONTACT_TOPICS = [
+  { label: 'A question', value: 'question' },
+  { label: 'Remove my data', value: 'data-request' },
+  { label: 'Report a problem', value: 'problem' },
+  { label: 'A suggestion', value: 'suggestion' },
+  { label: 'Something else', value: 'other' },
+];
+
 const PROOF_TYPES = [
   { label: 'Attestation (checkbox)', value: 'attestation' },
   { label: 'Photo / video / audio', value: 'media' },
@@ -318,10 +326,50 @@ const catalogs = {
       },
     ],
   },
+  // What people send from the contact form. Read and tidy them in the admin tool.
+  messages: {
+    title: 'Messages',
+    collection: 'contact-messages',
+    keyed: false,
+    newestFirst: true,
+    titleField: 'message',
+    fields: [
+      {
+        name: 'status',
+        label: 'Status',
+        type: 'select',
+        default: 'new',
+        options: [
+          { label: 'New', value: 'new' },
+          { label: 'Handled', value: 'handled' },
+        ],
+      },
+      {
+        name: 'topic',
+        label: 'Topic',
+        type: 'select',
+        options: CONTACT_TOPICS,
+      },
+      { name: 'message', label: 'Message', type: 'text', required: true },
+      {
+        name: 'replyTo',
+        label: 'Reply to',
+        type: 'string',
+        help: 'Where they asked to be answered (empty if they did not)',
+      },
+      {
+        name: 'username',
+        label: 'Username',
+        type: 'string',
+        help: 'Only there if they were logged in and chose to include it',
+      },
+      { name: 'received', label: 'Received', type: 'string' },
+    ],
+  },
   // Existing collection used by the Slave Training tool. Its documents also
   // carry `rating` and `added`, which the admin API never overwrites.
   tasks: {
-    title: 'Slave training tasks',
+    title: 'Task library',
     collection: 'slave-training-tasks',
     keyed: false,
     titleField: 'task',

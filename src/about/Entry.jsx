@@ -1,11 +1,22 @@
 import React from 'react';
 import { Typography, Collapse, Divider } from 'antd';
+import { useLocation } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
-import IssueLink from './IssueLink';
+import ContactForm from './ContactForm';
 import useAnalytics from '../hooks/useAnalytics';
 
 export default function Entry() {
   useAnalytics('About');
+  const { hash } = useLocation();
+
+  // "Data policy" links in the footer come straight to its section
+  React.useEffect(() => {
+    if (!hash) return;
+    document
+      .getElementById(hash.slice(1))
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [hash]);
+
   return (
     <React.Fragment>
       <PageHeader title='About The Compliance Ledger' />
@@ -110,14 +121,70 @@ export default function Entry() {
         expandIconPosition='right'
       >
         <Collapse.Panel key='datapolicy' header='Data Policy'>
-          <Typography>
+          <Typography id='data-policy' style={{ maxWidth: 680 }}>
             <Typography.Paragraph>
-              Any data stored by this site is not personally identifiable unless
-              the data you enter personally identifies you. If you want any of
-              your data to be removed from the site I am happy to do that.
-              Please raise an issue here: <IssueLink />
+              Short version: you choose what goes in, you choose who sees it,
+              and you can take it out again.
             </Typography.Paragraph>
-            <Typography.Paragraph></Typography.Paragraph>
+            <Typography.Title level={5}>What is stored</Typography.Title>
+            <ul>
+              <li>
+                Your <b>username</b> and a <b>password</b> (kept only in a form
+                that can&rsquo;t be turned back into the password), plus a
+                recovery code kept the same way. No email address and no real
+                name are needed.
+              </li>
+              <li>
+                What you add to your <b>profile</b>: display name, pronouns,
+                what you tick in body parts and what&rsquo;s in bounds, and how
+                you rate each kink.
+              </li>
+              <li>
+                What happens inside a <b>dynamic</b>: tasks, rules, comments,
+                pauses, and anything submitted as proof &mdash; text, numbers,
+                photos, video, audio, or a location.
+              </li>
+              <li>
+                Messages sent from the contact form below, and when you were
+                last active (your partner sees that, as a rough &ldquo;last
+                active&rdquo;).
+              </li>
+            </ul>
+            <Typography.Title level={5}>Who can see it</Typography.Title>
+            <Typography.Paragraph>
+              Only the person you&rsquo;re in a dynamic with, and only after you
+              confirm that you&rsquo;re sharing your profile. They never see
+              your username or any other dynamic you&rsquo;re in. The person who
+              runs this site can technically read the database, so keep anything
+              you wouldn&rsquo;t want them to see out of free-text fields.
+            </Typography.Paragraph>
+            <Typography.Title level={5}>How long it is kept</Typography.Title>
+            <Typography.Paragraph>
+              For each kind of proof, you set how many days (at least one) your
+              partner can see what you submit. After that it&rsquo;s hidden from
+              them, and it&rsquo;s deleted for good once the longer of seven
+              days or your number has passed. Photos, video and audio are
+              deleted with it. A file you upload but never submit is removed
+              within a day or so.
+            </Typography.Paragraph>
+            <Typography.Title level={5}>Taking it out</Typography.Title>
+            <Typography.Paragraph>
+              Either of you can pause or end a dynamic at any time. Deleting
+              your account (My account, then Delete account) ends all of your
+              dynamics and removes your profile and login straight away. What
+              you submitted for tasks is deleted on the schedule above. The
+              wording of tasks, rules and comments from ended dynamics can no
+              longer be seen by anyone, but isn&rsquo;t erased automatically:
+              ask for that below with &ldquo;Remove my data&rdquo; and it will
+              be done.
+            </Typography.Paragraph>
+            <Typography.Title level={5}>Cookies and analytics</Typography.Title>
+            <Typography.Paragraph>
+              A cookie keeps you logged in. The site also uses Google Analytics
+              to count page views (which page, roughly where from, on what kind
+              of device). It isn&rsquo;t told your username or anything you type
+              here.
+            </Typography.Paragraph>
           </Typography>
         </Collapse.Panel>
         {/*<Collapse.Panel key="donate" header="Donate">*/}
@@ -129,20 +196,11 @@ export default function Entry() {
         {/*  </Typography>*/}
         {/*</Collapse.Panel>*/}
         <Collapse.Panel key='contactus' header='Contact Us'>
-          <Typography>
-            <Typography.Paragraph>
-              If you have an idea for a tool that can be added to this site, I'd
-              be happy to hear it. Even if it's just an idea. Please raise an
-              issue here: <IssueLink />
-            </Typography.Paragraph>
-            <Typography.Paragraph>
-              {`If you wish to contact me for any other reason relating to this site
-              you can email: `}
-              <Typography.Link href='mailto:keepsafemaster@gmail.com'>
-                keepsafemaster@gmail.com
-              </Typography.Link>
-            </Typography.Paragraph>
-          </Typography>
+          <Typography.Paragraph style={{ maxWidth: 560 }} id='contact'>
+            A question, a problem, an idea, or a request to remove your data. It
+            goes straight to whoever runs the site.
+          </Typography.Paragraph>
+          <ContactForm />
         </Collapse.Panel>
       </Collapse>
     </React.Fragment>

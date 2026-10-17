@@ -46,6 +46,7 @@ export default function Header() {
     <Affix offsetTop={0}>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <PageHeader
+          setDocumentTitle={false}
           title='The Compliance Ledger'
           onBack={pathname !== '/' ? back : undefined}
           tags={<Tag color='red'>{process.env.VERSION}</Tag>}

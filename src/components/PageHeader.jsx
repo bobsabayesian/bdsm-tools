@@ -4,7 +4,21 @@ import { ArrowLeftOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
 
-const PageHeader = ({ title, onBack, tags, avatar, style }) => {
+const PageHeader = ({
+  title,
+  onBack,
+  tags,
+  avatar,
+  style,
+  setDocumentTitle = true,
+}) => {
+  // The tab's title says where you are
+  React.useEffect(() => {
+    if (setDocumentTitle && typeof title === 'string') {
+      document.title = `${title} \u00b7 The Compliance Ledger`;
+    }
+  }, [title, setDocumentTitle]);
+
   return (
     <div
       style={{

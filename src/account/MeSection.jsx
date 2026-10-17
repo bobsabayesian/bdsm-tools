@@ -124,6 +124,7 @@ export default function MeSection({ onDirty }) {
             style={{ marginTop: 4, maxWidth: 320 }}
             aria-label='Display name'
             placeholder='e.g. Zak, or Sara (without an H)'
+            autoComplete='nickname'
             value={me.displayName ?? ''}
             onChange={(e) => setMe({ ...me, displayName: e.target.value })}
           />

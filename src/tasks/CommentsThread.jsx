@@ -64,7 +64,7 @@ export default function CommentsThread({
           <Input.TextArea
             autoSize={{ minRows: 1, maxRows: 5 }}
             maxLength={2000}
-            placeholder='Add a comment'
+            placeholder='Add a comment\u2026'
             aria-label='Add a comment'
             value={draft}
             onChange={(e) => setDraft(e.target.value)}

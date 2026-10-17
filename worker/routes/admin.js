@@ -33,7 +33,11 @@ const readBody = (c) => c.req.json().catch(() => undefined);
 admin.get('/catalogs/:catalog/items', async (c) => {
   const catalog = c.get('catalog');
   const items = await listDocs(c.env.DB, catalog.collection, {
-    orderBy: catalog.keyed ? "json_extract(doc, '$.key')" : 'added',
+    orderBy: catalog.keyed
+      ? "json_extract(doc, '$.key')"
+      : catalog.newestFirst
+        ? 'added DESC'
+        : 'added',
   });
   return c.json(items);
 });

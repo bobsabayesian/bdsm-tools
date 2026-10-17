@@ -355,7 +355,7 @@ export default function KinksStep({ onDone, embedded = false, onDirty }) {
         <Space wrap>
           <Input.Search
             allowClear
-            placeholder='Find a kink'
+            placeholder='Find a kink\u2026'
             aria-label='Find a kink'
             style={{ width: 240 }}
             onChange={(e) => setSearch(e.target.value)}

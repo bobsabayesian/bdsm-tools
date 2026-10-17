@@ -399,7 +399,7 @@ export default function AssignTaskModal({
                     <>
                       <Input.Search
                         allowClear
-                        placeholder='Search tasks'
+                        placeholder='Search tasks\u2026'
                         aria-label='Search tasks'
                         style={{ marginBottom: 8 }}
                         onChange={(e) => setSearch(e.target.value)}
@@ -490,7 +490,7 @@ export default function AssignTaskModal({
                           mode='multiple'
                           showSearch
                           optionFilterProp='label'
-                          placeholder='Search to add tags'
+                          placeholder='Search to add tags\u2026'
                           options={guardrailOptions}
                         />
                       </Form.Item>
@@ -506,7 +506,7 @@ export default function AssignTaskModal({
                           mode='multiple'
                           showSearch
                           optionFilterProp='label'
-                          placeholder='Search to add kinks'
+                          placeholder='Search to add kinks\u2026'
                           options={asOptions(kinks)}
                         />
                       </Form.Item>
