@@ -1,5 +1,6 @@
 import React from 'react';
-import { App, Button, Checkbox, Space, Spin, Typography } from 'antd';
+import { Alert, App, Button, Checkbox, Space, Spin, Typography } from 'antd';
+import { Link } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import PageHeader from '../components/PageHeader';
 import useCatalog from '../hooks/useCatalog';
@@ -112,6 +113,24 @@ export default function BodyPartsStep({ onDone, embedded = false, onDirty }) {
           &mdash; nothing is hidden between you. You can change them at any
           time.
         </Typography.Text>
+        <Alert
+          type='info'
+          showIcon
+          title={'This overlaps with "What\'s in bounds?" on purpose'}
+          description={
+            <>
+              Some of what you tick here also appears in{' '}
+              {embedded ? (
+                <Link to='/account/about/bounds'>What&rsquo;s in bounds?</Link>
+              ) : (
+                <>&ldquo;What&rsquo;s in bounds?&rdquo; (the next step)</>
+              )}
+              . That&rsquo;s deliberate: it&rsquo;s better to say something
+              twice than to leave it unsaid. Tasks check each list on its own,
+              so a choice in one doesn&rsquo;t count for the other.
+            </>
+          }
+        />
 
         <div>
           <Typography.Text strong>Quick start</Typography.Text>{' '}

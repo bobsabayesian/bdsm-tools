@@ -116,6 +116,8 @@ dynamic's page (`PartnerProfile`).
   is asked about sex or gender, the quick-start presets only ever add to what is ticked, and skipping
   is fine. Body parts, groups and presets are editable in the admin tool (`worker/catalogs.js`). When
   writing task text, please use neutral wording ("your", "they") rather than gendered pronouns.
+- **My Body and What's in bounds? overlap on purpose** - it's better to over-specify than to leave something
+  unsaid - and both pages say so. Tasks check each list on its own; a choice in one doesn't count for the other.
 - **What's in bounds?** is its own tab, separate from My Body, and replaces the old My Equipment. One
   screen holds four lists a person can put in bounds for tasks: **Body & Anatomy** (a finer list than My
   Body), **Clothing, Underwear & Presentation**, **Items** (the equipment list) and **Spaces** (none yet, so
