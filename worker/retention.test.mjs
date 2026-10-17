@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   daysFor,
+  effectiveDays,
   deleteAfterDays,
   fullPolicy,
   readPolicy,
@@ -42,4 +43,18 @@ test("the partner stops seeing it after the person's number of days", () => {
   assert.equal(at(8, true), 'deleted'); // a week later it is gone for everyone
   assert.equal(at(8, false), 'deleted');
   assert.equal(visibility({ submittedAt: null, days: 2, now }), 'visible');
+});
+
+test("what is kept is the shorter of the two partners' numbers", () => {
+  const days = (requested, setterDefault, doerMax) =>
+    effectiveDays({ requested, setterDefault, doerMax });
+  assert.equal(days(undefined, 30, 7), 7, 'their limit wins');
+  assert.equal(
+    days(undefined, 3, 30),
+    3,
+    "the setter's default wins when shorter",
+  );
+  assert.equal(days(10, 30, 30), 10, 'asked for less');
+  assert.equal(days(60, 30, 20), 20, 'asked for more than they allow');
+  assert.equal(days(0, 5, 30), 5, 'nonsense counts as not asked');
 });

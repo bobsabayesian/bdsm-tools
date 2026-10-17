@@ -439,7 +439,6 @@ const catalogs = {
         label: 'Allowed distance (metres)',
         type: 'number',
       }),
-      { name: 'bonusTask', label: 'Bonus task', type: 'text' },
       { name: 'timeOptions', label: 'Time options', type: 'strings' },
       {
         name: 'requiresBodyPart',

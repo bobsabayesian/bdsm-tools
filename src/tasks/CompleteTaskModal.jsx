@@ -142,11 +142,6 @@ export default function CompleteTaskModal({
       ]}
     >
       <Space orientation='vertical' size='middle' style={{ width: '100%' }}>
-        {task.bonusTask && (
-          <Typography.Paragraph type='secondary' style={{ margin: 0 }}>
-            Bonus: {task.bonusTask}
-          </Typography.Paragraph>
-        )}
         {assignment.feedback && (
           <Alert
             type='info'

@@ -248,3 +248,18 @@ test('a media response is whatever the server found uploaded', () => {
     media: { kind: 'photo', contentType: 'image/png', size: 5 },
   });
 });
+
+test('a kind of task someone is not up for cannot be assigned', () => {
+  const none = availability({ proof: 'media' }, [], ['media']);
+  assert.equal(none.assignable, false);
+  assert.deepEqual(none.reasons, [{ code: 'task-type', proof: 'media' }]);
+  assert.equal(
+    availability({ proof: 'timer' }, [], ['media']).assignable,
+    true,
+  );
+  assert.equal(
+    availability({}, [], ['attestation']).assignable,
+    false,
+    'no proof set means attestation',
+  );
+});

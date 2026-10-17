@@ -2,6 +2,7 @@ import React from 'react';
 import {
   App,
   Button,
+  Checkbox,
   Input,
   InputNumber,
   Select,
@@ -33,6 +34,7 @@ const normalise = (me) =>
     me.about.trim(),
     me.ruleChangeMinDays,
     me.dataRetention,
+    [...me.unwillingTaskTypes].sort(),
   ]);
 
 /**
@@ -45,8 +47,19 @@ export default function MeSection({ onDirty }) {
   const [me, setMe] = React.useState(null);
   const [saved, setSaved] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
+  const [roles, setRoles] = React.useState(null); // roles held in open dynamics
 
   React.useEffect(() => {
+    api
+      .listDynamics()
+      .then((list) =>
+        setRoles(
+          new Set(
+            list.filter((d) => d.status !== 'ended').map((d) => d.you.role),
+          ),
+        ),
+      )
+      .catch(() => setRoles(new Set()));
     api
       .getProfile()
       .then((profile) => {
@@ -78,6 +91,10 @@ export default function MeSection({ onDirty }) {
   };
 
   const canSave = !!me.displayName?.trim() && normalise(me) !== saved;
+  // Which explanations apply depends on the roles they hold (both if unsure)
+  const known = roles && roles.size > 0;
+  const showSub = !known || roles.has('sub') || roles.has('self');
+  const showDom = !known || roles.has('dom') || roles.has('self');
   const offeredGenders = new Set(genders.map((g) => g.value));
 
   return (
@@ -204,15 +221,61 @@ export default function MeSection({ onDirty }) {
           </Space>
         </div>
 
+        {showSub && (
+          <div>
+            <Typography.Text strong>
+              Task types I&rsquo;m up for
+            </Typography.Text>
+            <Typography.Paragraph type='secondary' style={{ margin: 0 }}>
+              Untick any kind of task you don&rsquo;t want to be given. Tasks of
+              that kind can&rsquo;t be assigned to you, and the person setting
+              tasks can see why. Tick them again whenever you like.
+            </Typography.Paragraph>
+            <Space orientation='vertical' size={0} style={{ marginTop: 4 }}>
+              {Object.entries(PROOF_LABELS).map(([kind, label]) => (
+                <Checkbox
+                  key={kind}
+                  checked={!me.unwillingTaskTypes.includes(kind)}
+                  onChange={(e) =>
+                    setMe({
+                      ...me,
+                      unwillingTaskTypes: e.target.checked
+                        ? me.unwillingTaskTypes.filter((k) => k !== kind)
+                        : [...me.unwillingTaskTypes, kind],
+                    })
+                  }
+                >
+                  {label}
+                </Checkbox>
+              ))}
+            </Space>
+          </div>
+        )}
+
         <div>
           <Typography.Text strong>Data retention</Typography.Text>
+          {showSub && (
+            <Typography.Paragraph type='secondary' style={{ margin: 0 }}>
+              <b>When you&rsquo;re given tasks:</b> the person who set a task
+              can see what you submit for this many days, depending on the kind
+              of proof. After that it is hidden from them, and a few days later
+              removed altogether (never sooner than a week, so nothing
+              disappears by accident). You always see your own. This is the most
+              they can choose for you.
+            </Typography.Paragraph>
+          )}
+          {showDom && (
+            <Typography.Paragraph type='secondary' style={{ margin: 0 }}>
+              <b>When you set tasks:</b> a new task defaults to keeping what
+              your partner submits for this many days, depending on the kind of
+              proof. You can change it for each task, and it never goes over the
+              maximum your partner has set &mdash; the shorter of the two always
+              applies.
+            </Typography.Paragraph>
+          )}
           <Typography.Paragraph type='secondary' style={{ margin: 0 }}>
-            When you submit something for a task, the person who assigned it can
-            see it for this many days, depending on the kind of proof. After
-            that it is hidden from them, and a few days later removed altogether
-            (never sooner than a week, so nothing disappears by accident). You
-            always see your own. The shortest is 1 day, and changes only apply
-            to tasks assigned after you make them.
+            The shortest is 1 day. Changes only apply to tasks set after you
+            make them.
           </Typography.Paragraph>
           <Space orientation='vertical' size={4} style={{ marginTop: 4 }}>
             {Object.entries(PROOF_LABELS).map(([kind, label]) => (

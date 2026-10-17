@@ -11,6 +11,7 @@ export const errorData = (e) => e?.response?.data ?? {};
 const list = (id) => call('get', `/${id}/tasks`);
 const library = (id) => call('get', `/${id}/library`);
 const taskFields = (id) => call('get', `/${id}/task-fields`);
+const retention = (id) => call('get', `/${id}/retention`);
 const assign = (id, body) => call('post', `/${id}/tasks`, body);
 const start = (id, aid) => call('post', `/${id}/tasks/${aid}/start`, {});
 const submit = (id, aid, response) =>
@@ -41,6 +42,7 @@ const comment = (id, target, body) =>
   call('post', `/${id}/comments`, { target, body });
 
 export default {
+  retention,
   mediaUrl,
   uploadMedia,
   list,

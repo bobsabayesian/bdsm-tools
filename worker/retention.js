@@ -58,6 +58,32 @@ export const readPolicy = (input, current = {}) => {
   return next;
 };
 
+/** A list of task kinds from a request, or null if invalid */
+export const readKinds = (input) =>
+  Array.isArray(input) && input.every((k) => PROOF_KINDS.includes(k))
+    ? [...new Set(input)]
+    : null;
+
+/** Stored list of task kinds (bad data counts as none) */
+export const parseKinds = (text) => {
+  try {
+    const value = JSON.parse(text ?? '[]');
+    return Array.isArray(value)
+      ? value.filter((k) => PROOF_KINDS.includes(k))
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Days a task's content is kept: what the person setting it asks for (or, if
+ * they didn't say, their own default) - but never more than the person doing it
+ * allows. So it is always the shorter of the two partners' numbers.
+ */
+export const effectiveDays = ({ requested, setterDefault, doerMax }) =>
+  Math.min(whole(requested) ? requested : setterDefault, doerMax);
+
 /** Days after submitting that the submission is removed altogether */
 export const deleteAfterDays = (days) => Math.max(DELETE_FLOOR_DAYS, days);
 

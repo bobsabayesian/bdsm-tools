@@ -2,7 +2,13 @@ import { Hono } from 'hono';
 import { noStore, requireJson, requireUser } from '../accounts';
 import { catalogs } from '../catalogs';
 import { LEVELS, sidesFor } from '../limits';
-import { fullPolicy, parsePolicy, readPolicy } from '../retention';
+import {
+  fullPolicy,
+  parseKinds,
+  parsePolicy,
+  readKinds,
+  readPolicy,
+} from '../retention';
 import { DEFAULT_MIN_DAYS, wholeDays } from '../rules';
 
 /**
@@ -75,6 +81,7 @@ export const readAbout = (
   minDays = DEFAULT_MIN_DAYS,
   displayName = undefined,
   retention = '{}',
+  unwilling = '[]',
 ) => ({
   genders: row ? JSON.parse(row.genders) : [],
   pronouns: row ? JSON.parse(row.pronouns) : [],
@@ -82,6 +89,8 @@ export const readAbout = (
   ruleChangeMinDays: minDays,
   // days their partner can see what they submit, for each kind of proof
   dataRetention: fullPolicy(parsePolicy(retention)),
+  // kinds of task they are not up for
+  unwillingTaskTypes: parseKinds(unwilling),
   ...(displayName === undefined ? {} : { displayName: displayName ?? '' }),
 });
 
@@ -131,9 +140,10 @@ profile.get('/', async (c) => {
     rule_change_min_days: minDays,
     display_name: displayName,
     data_retention: retention,
+    unwilling_task_types: unwilling,
   } = await db
     .prepare(
-      'SELECT profile_shared_at, rule_change_min_days, display_name, data_retention FROM users WHERE id = ?',
+      'SELECT profile_shared_at, rule_change_min_days, display_name, data_retention, unwilling_task_types FROM users WHERE id = ?',
     )
     .bind(userId)
     .first();
@@ -146,7 +156,7 @@ profile.get('/', async (c) => {
       sharedAt,
       needsReview: !sharedAt && (results.length > 0 || !!aboutRow),
     },
-    me: readAbout(aboutRow, minDays, displayName, retention),
+    me: readAbout(aboutRow, minDays, displayName, retention, unwilling),
     nextStep: steps.find((step) => !step.status)?.id ?? null,
     selections: Object.fromEntries(
       Object.keys(STEPS).map((id) => [
@@ -212,6 +222,10 @@ profile.put('/me', async (c) => {
     body.dataRetention === undefined
       ? undefined
       : readPolicy(body.dataRetention, current);
+  const unwilling =
+    body.unwillingTaskTypes === undefined
+      ? undefined
+      : readKinds(body.unwillingTaskTypes);
   // The name pre-filled when starting or joining a dynamic; '' clears it
   // eslint-disable-next-line no-control-regex
   const controls = /[\u0000-\u001f]/g;
@@ -233,6 +247,7 @@ profile.put('/me', async (c) => {
     about.length > MAX_ABOUT ||
     minDays === null ||
     retention === null ||
+    unwilling === null ||
     displayName === null ||
     displayName === '' ||
     (displayName !== undefined && displayName.length > MAX_DISPLAY_NAME)
@@ -274,6 +289,13 @@ profile.put('/me', async (c) => {
           db
             .prepare('UPDATE users SET rule_change_min_days = ? WHERE id = ?')
             .bind(minDays, userId),
+        ]),
+    ...(unwilling === undefined
+      ? []
+      : [
+          db
+            .prepare('UPDATE users SET unwilling_task_types = ? WHERE id = ?')
+            .bind(JSON.stringify(unwilling), userId),
         ]),
     ...(retention === undefined
       ? []

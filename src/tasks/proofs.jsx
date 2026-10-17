@@ -17,6 +17,53 @@ export const PROOF_LABEL = {
 /** "Question | Answer" -> "Question" (the person doing a quiz is only ever sent the question) */
 export const questionOf = (entry) => String(entry).split('|')[0].trim();
 
+const MEDIA_WORD = {
+  photo: 'a photo',
+  video: 'a video',
+  audio: 'a recording',
+};
+
+/** What the person doing a task will be asked to do, in a sentence */
+export function requirement(task) {
+  const quoted = (text) => `\u201c${text}\u201d`;
+  switch (task.proof ?? 'attestation') {
+    case 'media':
+      return `You upload ${MEDIA_WORD[task.allowedMedia] ?? 'a photo, video or recording'}.`;
+    case 'numeric': {
+      const unit = task.unit ? ` (${task.unit})` : '';
+      const hasMin = typeof task.minValue === 'number';
+      const hasMax = typeof task.maxValue === 'number';
+      const range =
+        hasMin && hasMax
+          ? `, between ${task.minValue} and ${task.maxValue}`
+          : hasMin
+            ? `, at least ${task.minValue}`
+            : hasMax
+              ? `, at most ${task.maxValue}`
+              : '';
+      return `You enter a number${unit}${range}.`;
+    }
+    case 'text':
+      return `You write ${task.minLength ? `at least ${task.minLength} characters` : 'a response'}${task.prompt ? ` to ${quoted(task.prompt)}` : ''}.`;
+    case 'lines':
+      return `You write ${quoted(task.phrase)} ${task.repetitions ?? 1} ${task.repetitions === 1 ? 'time' : 'times'}, one per line.`;
+    case 'timer':
+      return `You hold for ${Math.floor((task.seconds ?? 0) / 60)}m ${(task.seconds ?? 0) % 60}s without a break.`;
+    case 'choice':
+      return `You choose one: ${(task.choices ?? []).join(', ')}.`;
+    case 'quiz': {
+      const n = (task.questions ?? []).length;
+      return `You answer ${n} ${n === 1 ? 'question' : 'questions'} correctly.`;
+    }
+    case 'checkin':
+      return 'You check in. The time is recorded, and checking in after the due time is noted.';
+    case 'location':
+      return `You share your location${task.place ? ` at ${task.place}` : ''}.`;
+    default:
+      return 'You mark it done.';
+  }
+}
+
 /** What someone submitted, in a line or two, for the list and for review */
 export function ResponseSummary({ task, response, mediaUrl }) {
   if (!response) return null;

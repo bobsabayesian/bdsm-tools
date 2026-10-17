@@ -11,7 +11,6 @@ import {
   CheckSquareOutlined,
   FileTextOutlined,
 } from '@ant-design/icons';
-import { isMobile } from 'react-device-detect';
 
 export default function NavMenu({ vertical = false }) {
   const { pathname } = useLocation();
@@ -21,7 +20,7 @@ export default function NavMenu({ vertical = false }) {
       <Menu
         mode={vertical ? 'inline' : 'horizontal'}
         selectedKeys={pathname === '/' ? '/' : pathname.split('/')}
-        defaultOpenKeys={isMobile ? [] : ['tools', ...pathname.split('/')]}
+        defaultOpenKeys={[]}
         style={{ minWidth: 0, flex: 'auto' }}
         items={[
           {

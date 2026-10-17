@@ -18,7 +18,14 @@ import {
   mediaKey,
   parseRange,
 } from '../media';
-import { daysFor, parsePolicy, visibility } from '../retention';
+import {
+  daysFor,
+  effectiveDays,
+  fullPolicy,
+  parseKinds,
+  parsePolicy,
+  visibility,
+} from '../retention';
 import { getDoc, listDocs } from '../docs';
 import { resumeDuePauses } from './dynamics';
 
@@ -117,6 +124,20 @@ const assigneeReady = async (c, m) => {
 };
 
 const forbid = (c, message) => c.json({ error: message }, 403);
+
+/** { policy, unwilling } - what someone has said about retention and kinds of task */
+const preferencesOf = async (db, userId) => {
+  const row = await db
+    .prepare(
+      'SELECT data_retention, unwilling_task_types FROM users WHERE id = ?',
+    )
+    .bind(userId)
+    .first();
+  return {
+    policy: parsePolicy(row?.data_retention),
+    unwilling: parseKinds(row?.unwilling_task_types),
+  };
+};
 
 const selectionsOf = async (db, userId) => {
   const { results } = await db
@@ -245,6 +266,23 @@ dynamicWork.get('/:id/tasks', async (c) => {
   });
 });
 
+// Days of content retention: the default for tasks you set (yours) and the most
+// your partner allows (theirs), for each kind of proof
+dynamicWork.get('/:id/retention', async (c) => {
+  const { m, res } = await guard(c);
+  if (res) return res;
+  if (!m.canAssign)
+    return forbid(c, 'Only the person with control can assign tasks');
+  const [mine, theirs] = await Promise.all([
+    preferencesOf(c.env.DB, m.me.user_id),
+    preferencesOf(c.env.DB, m.assignee.user_id),
+  ]);
+  return c.json({
+    mine: fullPolicy(mine.policy),
+    theirs: fullPolicy(theirs.policy),
+  });
+});
+
 // The task library, with what is and is not possible for the person who would do it
 dynamicWork.get('/:id/library', async (c) => {
   const { m, res } = await guard(c);
@@ -255,9 +293,10 @@ dynamicWork.get('/:id/library', async (c) => {
   if (notReady) return notReady;
   const db = c.env.DB;
 
-  const [tasks, selections] = await Promise.all([
+  const [tasks, selections, { unwilling }] = await Promise.all([
     listDocs(db, TASKS, { limit: 500 }),
     selectionsOf(db, m.assignee.user_id),
+    preferencesOf(db, m.assignee.user_id),
   ]);
   const fields = catalogs.tasks.fields.map((f) => f.name);
 
@@ -265,7 +304,7 @@ dynamicWork.get('/:id/library', async (c) => {
     tasks
       .filter((task) => task.task)
       .map((task) => {
-        const a = availability(task, selections);
+        const a = availability(task, selections, unwilling);
         return {
           id: task._id,
           ...Object.fromEntries(
@@ -330,7 +369,8 @@ dynamicWork.post('/:id/tasks', async (c) => {
           ['give', 'receive', 'any'].includes(a.direction),
       )
     : [];
-  const options = availability(task, selections);
+  const doer = await preferencesOf(db, m.assignee.user_id);
+  const options = availability(task, selections, doer.unwilling);
   if (options.reasons.length > 0) {
     return c.json(
       {
@@ -366,15 +406,16 @@ dynamicWork.post('/:id/tasks', async (c) => {
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
-  // the doer's policy for this kind of proof, kept with the task from now on
-  const policy = parsePolicy(
-    (
-      await db
-        .prepare('SELECT data_retention FROM users WHERE id = ?')
-        .bind(m.assignee.user_id)
-        .first()
-    )?.data_retention,
-  );
+  // How long what they submit is kept: the shorter of what the person setting
+  // it wants (their own default, or what they asked for here) and the most the
+  // person doing it allows. Kept with the task from now on.
+  const setter = await preferencesOf(db, m.me.user_id);
+  const proof = task.proof ?? 'attestation';
+  const retentionDays = effectiveDays({
+    requested: input.retentionDays,
+    setterDefault: daysFor(setter.policy, proof),
+    doerMax: daysFor(doer.policy, proof),
+  });
   await db
     .prepare(
       `INSERT INTO assignments (id, dynamic_id, assigned_by, assigned_to, template_id, task, status,
@@ -392,7 +433,7 @@ dynamicWork.post('/:id/tasks', async (c) => {
       due,
       JSON.stringify(m.kind === 'solo' ? [] : verdict.attested),
       now,
-      daysFor(policy, task.proof),
+      retentionDays,
     )
     .run();
 

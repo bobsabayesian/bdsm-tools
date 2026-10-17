@@ -20,7 +20,7 @@ import { kinkWithSide } from '../account/kinkText';
 import AssignTaskModal from './AssignTaskModal';
 import CommentsThread from './CommentsThread';
 import CompleteTaskModal from './CompleteTaskModal';
-import { PROOF_LABEL, ResponseSummary } from './proofs';
+import { PROOF_LABEL, requirement, ResponseSummary } from './proofs';
 import ReviewModal from './ReviewModal';
 
 const STATUS = {
@@ -57,11 +57,7 @@ function TaskCard({
       extra={<Tag color={status.color}>{status.label}</Tag>}
     >
       <Space orientation='vertical' size={4} style={{ width: '100%' }}>
-        {task.bonusTask && (
-          <Typography.Text type='secondary'>
-            Bonus: {task.bonusTask}
-          </Typography.Text>
-        )}
+        <Typography.Text type='secondary'>{requirement(task)}</Typography.Text>
         <Space wrap size={4}>
           <Tag>{PROOF_LABEL[task.proof ?? 'attestation']}</Tag>
           {a.dueAt && (

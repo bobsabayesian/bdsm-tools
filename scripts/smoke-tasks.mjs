@@ -291,7 +291,11 @@ assert.equal(
   201,
 );
 assert.equal((await assign(lib['Needs feet'])).json.code, 'unavailable');
-assert.equal((await assign(lib.Photo)).status, 201, 'photo tasks can be assigned now');
+assert.equal(
+  (await assign(lib.Photo)).status,
+  201,
+  'photo tasks can be assigned now',
+);
 const hard = await assign(lib.Spank, {
   attested: [{ key: 'spanking', direction: 'receive' }],
 });
@@ -413,6 +417,77 @@ assert.equal(
   30,
   'an earlier task keeps the policy it had',
 );
+
+step(
+  'retention is the shorter of the two partners, and kinds of task can be declined',
+);
+// the sub allows 3 days for attestation (set above); the dom's default is 30
+const domMe = (await dom.call('GET', '/profile')).json.me;
+const limits = (await dom.call('GET', `${P}/retention`)).json;
+assert.equal(limits.theirs.attestation, 3);
+assert.equal(limits.mine.attestation, 30);
+assert.equal((await sub.call('GET', `${P}/retention`)).status, 403);
+const asked = (await assign(lib.Kneel, { retentionDays: 2 })).json;
+assert.equal(asked.retentionDays, 2, 'the dom asked for less');
+const tooMany = (await assign(lib.Kneel, { retentionDays: 90 })).json;
+assert.equal(tooMany.retentionDays, 3, 'never more than the sub allows');
+assert.equal(
+  (
+    await dom.call('PUT', '/profile/me', {
+      ...domMe,
+      dataRetention: { attestation: 1 },
+    })
+  ).status,
+  204,
+);
+assert.equal(
+  (await assign(lib.Kneel)).json.retentionDays,
+  1,
+  "the dom's own default can be shorter",
+);
+await dom.call('PUT', '/profile/me', {
+  ...domMe,
+  dataRetention: { attestation: 30 },
+});
+assert.equal(
+  (
+    await sub.call('PUT', '/profile/me', {
+      ...mine,
+      unwillingTaskTypes: ['nonsense'],
+    })
+  ).status,
+  400,
+);
+assert.equal(
+  (
+    await sub.call('PUT', '/profile/me', {
+      ...mine,
+      dataRetention: { attestation: 3 },
+      unwillingTaskTypes: ['quiz'],
+    })
+  ).status,
+  204,
+);
+const quizTry = await assign(lib.Quiz);
+assert.equal(quizTry.status, 409, 'not up for quizzes');
+assert.equal(quizTry.json.code, 'unavailable');
+assert.deepEqual(quizTry.json.reasons, [{ code: 'task-type', proof: 'quiz' }]);
+const libNow = (await dom.call('GET', `${P}/library`)).json;
+assert.equal(
+  libNow.find((t) => t.task === 'Quiz').availability.assignable,
+  false,
+);
+assert.ok(libNow.every((t) => t.bonusTask === undefined));
+assert.deepEqual(
+  (await dom.call('GET', `${P}/profile`)).json.me.unwillingTaskTypes,
+  ['quiz'],
+);
+await sub.call('PUT', '/profile/me', {
+  ...mine,
+  dataRetention: { attestation: 3 },
+  unwillingTaskTypes: [],
+});
+assert.equal((await assign(lib.Quiz)).status, 201, 'willing again');
 
 step('check-in and location proofs are recorded, never refused');
 const checkin = await dom.call('POST', `${P}/tasks`, {

@@ -223,6 +223,18 @@ export default function PartnerProfile({ dynamic }) {
               </Tag>
             ))}
           </div>
+          {me.unwillingTaskTypes.length > 0 && (
+            <div>
+              <Typography.Text type='secondary'>
+                {partner.name} is not up for these kinds of task:{' '}
+              </Typography.Text>
+              {me.unwillingTaskTypes.map((kind) => (
+                <Tag key={kind} color='orange'>
+                  {PROOF_LABELS[kind]}
+                </Tag>
+              ))}
+            </div>
+          )}
         </Space>
       ),
     },

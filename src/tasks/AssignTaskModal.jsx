@@ -6,6 +6,7 @@ import {
   Checkbox,
   Form,
   Input,
+  InputNumber,
   List,
   Modal,
   Radio,
@@ -20,7 +21,7 @@ import { kinkWithSide } from '../account/kinkText';
 import { fieldDefaults, renderFields } from '../components/FieldsForm';
 import api, { errorData, errorMessage } from '../services/tasks-api';
 import { SoftLimitDialog } from './Attest';
-import { PROOF_LABEL } from './proofs';
+import { PROOF_LABEL, requirement } from './proofs';
 
 const asOptions = (items) =>
   items.map((i) => ({ value: i.value, label: i.label }));
@@ -66,6 +67,9 @@ export default function AssignTaskModal({
   const [dueDate, setDueDate] = React.useState('');
   const [dueTime, setDueTime] = React.useState('');
   const [review, setReview] = React.useState(false);
+  const [limits, setLimits] = React.useState(null); // { mine, theirs } days of retention
+  const [keepDays, setKeepDays] = React.useState(null); // null: the default
+  const ownProof = Form.useWatch('proof', form);
   const [error, setError] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
   const [attest, setAttest] = React.useState(null); // soft limits awaiting Yes / Cancel
@@ -77,6 +81,11 @@ export default function AssignTaskModal({
     setError(null);
     setBlocked(null);
     setLibrary(null);
+    setKeepDays(null);
+    api
+      .retention(dynamicId)
+      .then(setLimits)
+      .catch(() => setLimits(null));
     api
       .library(dynamicId)
       .then(setLibrary)
@@ -107,6 +116,10 @@ export default function AssignTaskModal({
       if (reason.code === 'proof')
         parts.push(
           'needs photo, video or audio proof, which is not available yet',
+        );
+      if (reason.code === 'task-type')
+        parts.push(
+          `${partner} is not up for "${PROOF_LABEL[reason.proof]}" tasks`,
         );
       if (reason.code === 'body-part')
         parts.push(
@@ -152,6 +165,7 @@ export default function AssignTaskModal({
       await api.assign(dynamicId, {
         ...(tab === 'own' ? { task } : { templateId: selected }),
         dueAt: dueInstant(dueMode, dueDate, dueTime),
+        retentionDays: keepDays ?? undefined,
         requiresReview: kind === 'pair' ? review : false,
         attested,
       });
@@ -182,6 +196,13 @@ export default function AssignTaskModal({
   };
 
   const canAssign = tab === 'own' || !!selected;
+  const chosenProof =
+    tab === 'own'
+      ? (ownProof ?? 'attestation')
+      : (library?.find((t) => t.id === selected)?.proof ??
+        (selected ? 'attestation' : null));
+  const maxKeep = limits?.theirs[chosenProof] ?? 365;
+  const defaultKeep = Math.min(limits?.mine[chosenProof] ?? 30, maxKeep);
   const shown = (library ?? []).filter((t) =>
     t.task.toLowerCase().includes(search.toLowerCase()),
   );
@@ -275,6 +296,11 @@ export default function AssignTaskModal({
                                 <Tag>
                                   {PROOF_LABEL[item.proof ?? 'attestation']}
                                 </Tag>
+                                <div>
+                                  <Typography.Text type='secondary'>
+                                    {requirement(item)}
+                                  </Typography.Text>
+                                </div>
                                 {a.softLimits.length > 0 && (
                                   <Tag color='orange'>
                                     touches a soft limit:{' '}
@@ -349,6 +375,32 @@ export default function AssignTaskModal({
                 </Space>
               )}
             </div>
+
+            {limits && chosenProof && chosenProof !== 'attestation' && (
+              <div>
+                <Typography.Text strong>
+                  Keep what they submit for
+                </Typography.Text>
+                <div>
+                  <Space>
+                    <InputNumber
+                      min={1}
+                      max={maxKeep}
+                      precision={0}
+                      aria-label='Days to keep what they submit'
+                      value={keepDays ?? defaultKeep}
+                      onChange={(value) => setKeepDays(value)}
+                    />
+                    <Typography.Text>days</Typography.Text>
+                  </Space>
+                </div>
+                <Typography.Text type='secondary'>
+                  {kind === 'solo'
+                    ? ''
+                    : `Your default is ${limits.mine[chosenProof]} days, and ${partner} allows at most ${maxKeep} for this kind of task - the shorter always applies.`}
+                </Typography.Text>
+              </div>
+            )}
 
             {kind === 'pair' && (
               <Checkbox

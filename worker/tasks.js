@@ -40,8 +40,13 @@ const NEEDS = [
   ['requiresSpaces', 'boundsSpaces', 'space'],
 ];
 
-export const availability = (task, selections) => {
+export const availability = (task, selections, unwilling = []) => {
   const reasons = [];
+
+  // the kind of task is one they are not up for
+  if (unwilling.includes(task.proof ?? 'attestation')) {
+    reasons.push({ code: 'task-type', proof: task.proof ?? 'attestation' });
+  }
 
   if (!SUPPORTED_PROOFS.includes(task.proof ?? 'attestation')) {
     reasons.push({ code: 'proof' });
