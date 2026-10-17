@@ -4,7 +4,7 @@ import moment from 'moment';
 import Task from './Task';
 import api from '../../services/slave-training-api';
 import { hash } from '../../util';
-import { bodyParts } from '../../components/MyBodyParts';
+import useCatalog from '../../hooks/useCatalog';
 import { useLocalStorageState } from 'ahooks';
 import { CloseOutlined } from '@ant-design/icons';
 import ReactGA from 'react-ga4';
@@ -26,6 +26,8 @@ export default function BodyPartTask({
   const [bodyPartState, setBodyPart] = React.useState(undefined);
 
   const { notification } = App.useApp();
+  const { items: bodyParts, loading: loadingBodyParts } =
+    useCatalog('bodyParts');
 
   const getTask = (bodyPart) => {
     ReactGA.event('task_generation_body_part', { bodyPart });
@@ -69,6 +71,7 @@ export default function BodyPartTask({
       <Space.Compact style={{ marginBottom: 20 }}>
         <Select
           options={bodyParts}
+          loading={loadingBodyParts}
           style={{ width: 180 }}
           placeholder='Select a body part'
           onChange={(value) => setBodyPart(value)}

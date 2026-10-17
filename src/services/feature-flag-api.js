@@ -1,4 +1,4 @@
-const baseUrl = process.env.FEATURE_FLAG_API_ROOT;
+const baseUrl = '/api/feature-flag';
 const get = (url, headers = {}) =>
   fetch(baseUrl + url, {
     method: 'GET',

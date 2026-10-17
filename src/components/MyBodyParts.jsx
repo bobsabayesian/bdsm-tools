@@ -1,46 +1,12 @@
 import React from 'react';
-import { Modal, Button, Typography, List } from 'antd';
+import { Modal, Button, Typography, List, Alert } from 'antd';
 import { PlusSquareOutlined, MinusSquareOutlined } from '@ant-design/icons';
-import { alphabeticalSort } from '../util';
+import useCatalog from '../hooks/useCatalog';
 import Cookies from 'js-cookie';
 import ReactGA from 'react-ga4';
 
-export const bodyParts = [
-  {
-    label: 'Ass',
-    value: 'ass',
-  },
-  {
-    label: 'Pussy',
-    value: 'pussy',
-  },
-  {
-    label: 'Penis',
-    value: 'penis',
-  },
-  {
-    label: 'Mouth',
-    value: 'mouth',
-  },
-  {
-    label: 'Throat',
-    value: 'throat',
-  },
-  {
-    label: 'Nipples',
-    value: 'nipples',
-  },
-  {
-    label: 'Balls',
-    value: 'balls',
-  },
-  {
-    label: 'Clothing',
-    value: 'clothing',
-  },
-].sort(alphabeticalSort(({ label }) => label));
-
 export default function MyBodyParts() {
+  const { items: bodyParts, loading, error } = useCatalog('bodyParts');
   const [open, setOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -57,7 +23,6 @@ export default function MyBodyParts() {
     () =>
       void Cookies.set('body-parts', myBodyParts.filter(Boolean).join('|'), {
         SameSite: 'Lax',
-        Domain: '.bdsmtools.org',
       }),
     [myBodyParts],
   );
@@ -114,12 +79,20 @@ export default function MyBodyParts() {
           Let us know what body parts you have and are willing to use so we can
           tailor the tools to what you have.
         </Typography.Paragraph>
+        {error && (
+          <Alert
+            type='error'
+            style={{ marginBottom: 16 }}
+            message='Could not load the list. Please try again later.'
+          />
+        )}
         <List
           header='My Body Parts'
           dataSource={bodyParts.filter(({ value }) =>
             myBodyParts.includes(value),
           )}
           bordered
+          loading={loading}
           renderItem={BodyPartItem}
         />
         <br />
@@ -129,6 +102,7 @@ export default function MyBodyParts() {
             ({ value }) => !myBodyParts.includes(value),
           )}
           bordered
+          loading={loading}
           renderItem={BodyPartItem}
         />
       </Modal>

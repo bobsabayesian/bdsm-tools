@@ -31,15 +31,6 @@ module.exports = merge(common, {
     new webpack.DefinePlugin({
       'process.env': {
         VERSION: JSON.stringify('development'),
-        SCENE_NEGOTIATION_API_ROOT: JSON.stringify(
-          'https://scene-negotiation.api.test.bdsmtools.org',
-        ),
-        FEATURE_FLAG_API_ROOT: JSON.stringify(
-          'https://feature-flag.api.test.bdsmtools.org',
-        ),
-        SLAVE_TRAINING_API_ROOT: JSON.stringify(
-          'https://slave-training.api.test.bdsmtools.org',
-        ),
       },
     }),
   ],

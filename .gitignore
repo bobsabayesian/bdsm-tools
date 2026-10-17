@@ -7,3 +7,6 @@ gha-creds-*.json
 *.tfstate.backup
 *.tfstate.lock.info
 .env
+.dev.vars
+.wrangler/
+scripts/migrate/data.sql

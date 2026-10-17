@@ -4,12 +4,10 @@ import Cookies from 'js-cookie';
 import moment from 'moment';
 import { captureHeader } from '../state/useGlobalHeader';
 
-const baseUrl = process.env.SLAVE_TRAINING_API_ROOT;
+const baseUrl = '/api/slave-training';
 
 Cookies.set('timezoneOffset', String(moment().utcOffset()), {
-  SameSite: 'None',
-  Secure: true,
-  Domain: '.bdsmtools.org',
+  SameSite: 'Lax',
 });
 
 const get = (url) =>
@@ -20,7 +18,6 @@ const get = (url) =>
         accept: 'application/json',
         'content-type': 'application/json',
       },
-      withCredentials: true,
     })
     .then(captureHeader('x-bdsmtools-slave-task-count'))
     .then((res) => res.data);
@@ -32,7 +29,6 @@ const post = (url, body) =>
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      withCredentials: true,
     })
     .then(captureHeader('x-bdsmtools-slave-task-count'))
     .then((res) => res.data);
@@ -43,7 +39,6 @@ const postText = (url, body) =>
       headers: {
         'Content-Type': 'text/plain',
       },
-      withCredentials: true,
     })
     .then((res) => res.data);
 

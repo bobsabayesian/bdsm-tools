@@ -1,0 +1,14 @@
+{
+  "name": "bdsm-tools-migrate",
+  "private": true,
+  "type": "module",
+  "description": "One-off export of Mongo + Firestore data into SQL for Cloudflare D1",
+  "scripts": {
+    "export": "node --env-file=../../.env export.mjs",
+    "test": "node test.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "mongodb": "7.0.0"
+  }
+}

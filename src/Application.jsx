@@ -64,6 +64,10 @@ const TubePlannerEntry = React.lazy(
     ),
 );
 
+const AdminEntry = React.lazy(
+  () => import(/* webpackChunkName: "Admin" */ './admin/Entry'),
+);
+
 const AboutEntry = React.lazy(
   () =>
     import(
@@ -89,6 +93,7 @@ export default function Application() {
       <Routing>
         <Route path='/' element={<AppLayout />}>
           <Route index element={<Home />} />
+          <Route path='admin' element={<AdminEntry />} />
           <Route path='about/faq' element={<FaqEntry />} />
           <Route path='about/info' element={<AboutEntry />} />
           <Route path='tools' element={<FeatureFlagLayout />}>

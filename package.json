@@ -4,6 +4,10 @@
   "description": "BDSM Tools Web Application",
   "main": "index.js",
   "scripts": {
+    "dev:api": "wrangler dev --port 8787",
+    "db:migrate:local": "wrangler d1 migrations apply bdsm-tools --local",
+    "db:migrate": "wrangler d1 migrations apply bdsm-tools --remote",
+    "deploy": "npm run build && wrangler deploy",
     "start": "webpack serve --config webpack-local.config.js --progress --bail",
     "build": "webpack --config webpack-prod.config.js --bail && npm run update-version",
     "test-build": "webpack --config webpack-dev.config.js --bail && npm run update-version",
@@ -48,7 +52,8 @@
     "webpack-cli": "7.0.2",
     "webpack-dev-server": "5.2.3",
     "webpack-merge": "6.0.1",
-    "webpack-node-externals": "3.0.0"
+    "webpack-node-externals": "3.0.0",
+    "wrangler": "^4.151.1"
   },
   "dependencies": {
     "@ant-design/icons": "6.2.2",
@@ -69,6 +74,7 @@
     "buffer": "6.0.3",
     "crypto-browserify": "3.12.1",
     "crypto-js": "4.2.0",
+    "hono": "^4.13.13",
     "immer": "11.1.4",
     "js-cookie": "3.0.5",
     "leva": "0.10.1",

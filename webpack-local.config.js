@@ -20,6 +20,8 @@ module.exports = merge(common, {
     historyApiFallback: {
       index: '/',
     },
+    // `npm run dev:api` (wrangler) serves the API
+    proxy: [{ context: ['/api'], target: 'http://localhost:8787' }],
   },
 
   devtool: 'inline-cheap-source-map',
@@ -28,13 +30,6 @@ module.exports = merge(common, {
     new webpack.DefinePlugin({
       'process.env': {
         VERSION: JSON.stringify('development'),
-        SCENE_NEGOTIATION_API_ROOT: JSON.stringify(
-          'https://scene-negotiation.api.test.bdsmtools.org',
-        ),
-        FEATURE_FLAG_API_ROOT: JSON.stringify(
-          'https://feature-flag.api.test.bdsmtools.org',
-        ),
-        SLAVE_TRAINING_API_ROOT: JSON.stringify('http://localhost:3300'),
       },
     }),
   ],

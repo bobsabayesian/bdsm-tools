@@ -17,7 +17,7 @@ const compat = new FlatCompat({
 
 export default [
   {
-    ignores: ['**/dist/', '**/api/', 'src/data/'],
+    ignores: ['**/dist/', '**/api/', '**/.wrangler/', 'src/data/'],
   },
   ...compat.extends(
     'eslint:recommended',

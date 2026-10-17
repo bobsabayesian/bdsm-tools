@@ -20,6 +20,11 @@ export function convertMongoTimestamp(timestamp) {
     return timestamp;
   }
 
+  // Timestamps are ISO strings; legacy Mongo ones are { $timestamp }
+  if (typeof timestamp === 'string') {
+    return moment(timestamp);
+  }
+
   const { $timestamp: bsonTimestamp } = timestamp;
 
   // Convert the string timestamp to a BigInt (because it's a 64-bit value)

@@ -1,0 +1,30 @@
+{
+	"name": "bdsm-tools",
+	"main": "worker/index.js",
+	"compatibility_date": "2026-10-01",
+	// The built React app. Only /api/* runs the Worker; everything else is
+	// served as a static file, falling back to index.html for client routes.
+	"assets": {
+		"directory": "./dist",
+		"not_found_handling": "single-page-application",
+		"run_worker_first": [
+			"/api/*"
+		],
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "bdsm-tools",
+			// Replace with the id printed by `npx wrangler d1 create bdsm-tools`.
+			// (Local development works with any value.)
+			"database_id": "bcc66e40-7838-46fa-9e63-0742768c53e1",
+			"migrations_dir": "migrations",
+		},
+		{
+			"binding": "bdsm_tools",
+			"database_name": "bdsm-tools",
+			"database_id": "bcc66e40-7838-46fa-9e63-0742768c53e1"
+		},
+	],
+	// Secret: ADMIN_TOKEN (set with `npx wrangler secret put ADMIN_TOKEN`)
+}
