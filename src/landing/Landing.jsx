@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import ThemeToggle from '../components/ThemeToggle';
 import './landing.less';
 import savingsBook1930s from './img/savings-book-1930s.jpg';
 import savingsBook1912 from './img/savings-book-1912.jpg';
@@ -405,9 +406,12 @@ export default function Landing() {
           </div>
         </div>
         <div className='hero-right'>
-          <Link to='/account' className='login'>
-            Log in
-          </Link>
+          <div className='landing-tools'>
+            <ThemeToggle />
+            <Link to='/account' className='login'>
+              Log in
+            </Link>
+          </div>
           <BoundsDemo />
         </div>
       </section>

@@ -3,7 +3,7 @@
 // gradients, no shadows at rest, no rules - tone steps and space do the work.
 
 body:has(.landing) {
-  background: #1f1f1f;
+  background: var(--page-bg, #1f1f1f);
 }
 
 .landing {
@@ -14,6 +14,10 @@ body:has(.landing) {
   --muted: #aaa7a3;
   --accent: #d71616;
   --accent-ink: #ffffff;
+  --line: #4a4a4a;
+  --dot: #5a5a5a;
+  --disabled-bg: #4a4a4a;
+  --disabled-ink: #c4c1bd;
 
   --font: 'Jost', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --step-small: clamp(0.875rem, 0.85rem + 0.1vw, 0.9375rem);
@@ -208,7 +212,7 @@ body:has(.landing) {
     width: min(450px, 100%);
     padding: 1.5rem;
     background: var(--panel);
-    border: 1px solid #4a4a4a; // taste-skill-ignore: the product's own control keeps its border
+    border: 1px solid var(--line); // taste-skill-ignore: the product's own control keeps its border
     border-radius: 6px;
     font-size: 0.9375rem;
     line-height: 1.45;
@@ -280,8 +284,8 @@ body:has(.landing) {
     }
 
     &:disabled {
-      background: #4a4a4a;
-      color: #c4c1bd;
+      background: var(--disabled-bg);
+      color: var(--disabled-ink);
       cursor: not-allowed;
     }
   }
@@ -314,7 +318,7 @@ body:has(.landing) {
         width: 9px;
         height: 9px;
         border-radius: 50%;
-        background: #5a5a5a;
+        background: var(--dot);
 
         &.on {
           background: var(--ink);
@@ -728,5 +732,36 @@ body:has(.landing) {
     .foot-right {
       justify-self: start;
     }
+  }
+}
+
+// The light theme: same proportions, flat colour, no cream
+html[data-theme='light'] .landing {
+  --bg: #f5f5f5;
+  --surface: #e9e9e9;
+  --panel: #ffffff;
+  --ink: #1a1a1a;
+  --muted: #555555;
+  --line: #cfcfcf;
+  --dot: #bdbdbd;
+  --disabled-bg: #dcdcdc;
+  --disabled-ink: #5a5a5a;
+}
+
+.landing .landing-tools {
+  position: absolute;
+  top: calc(var(--margin) - 0.5rem);
+  right: var(--margin);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  z-index: 3;
+
+  .login {
+    position: static;
+  }
+
+  button {
+    color: var(--ink);
   }
 }

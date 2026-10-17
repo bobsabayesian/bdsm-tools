@@ -1,5 +1,14 @@
 import React from 'react';
-import { Alert, Button, Empty, Input, Space, Spin, Typography } from 'antd';
+import {
+  Alert,
+  Button,
+  Empty,
+  Input,
+  Space,
+  Spin,
+  Typography,
+  theme,
+} from 'antd';
 import { useParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import api, { errorMessage } from '../services/contact-api';
@@ -11,6 +20,7 @@ const when = (iso) => new Date(iso).toLocaleString();
  * account is needed, which is the point when the problem is being locked out.
  */
 export default function Thread() {
+  const { token: ui } = theme.useToken();
   const { token } = useParams();
   const [data, setData] = React.useState(null);
   const [missing, setMissing] = React.useState(false);
@@ -64,7 +74,8 @@ export default function Thread() {
               maxWidth: '85%',
               marginLeft: t.from === 'them' ? 'auto' : 0,
               padding: '10px 14px',
-              background: t.from === 'them' ? '#3a1a1a' : '#2f2f2f',
+              background:
+                t.from === 'them' ? ui.colorErrorBg : ui.colorFillSecondary,
               borderRadius: 4,
             }}
           >

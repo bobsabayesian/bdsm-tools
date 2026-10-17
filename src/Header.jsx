@@ -1,6 +1,7 @@
 import React from 'react';
 import { Tag, Affix, Button, Space, Typography } from 'antd';
 import PageHeader from './components/PageHeader';
+import ThemeToggle from './components/ThemeToggle';
 import { DeploymentUnitOutlined, LogoutOutlined } from '@ant-design/icons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from './services/account-api';
@@ -53,9 +54,10 @@ export default function Header() {
           avatar={{ icon: <DeploymentUnitOutlined /> }}
           style={{ margin: 0 }}
         />
-        <div style={{ marginLeft: 'auto' }}>
+        <Space size='small' style={{ marginLeft: 'auto' }}>
+          <ThemeToggle />
           <AccountStatus />
-        </div>
+        </Space>
       </div>
     </Affix>
   );

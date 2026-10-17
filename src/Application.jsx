@@ -30,6 +30,8 @@ import api from './services/feature-flag-api';
 import ComingSoon from './scene-negotiation/ComingSoon';
 import MobileUserWarning from './components/MobileUserWarning';
 import Landing from './landing/Landing';
+import { themeFor } from './theme';
+import useTheme from './state/useTheme';
 import useAccount from './state/useAccount';
 
 ReactGA.initialize('G-SKBSEEBLCP');
@@ -124,6 +126,7 @@ export default function Application() {
 }
 
 function AppLayout() {
+  const mode = useTheme((state) => state.mode);
   const { pathname } = useLocation();
   const { user, loaded, refresh } = useAccount();
 
@@ -134,54 +137,14 @@ function AppLayout() {
   // Someone who is not logged in lands on a page of their own, outside the app's frame
   if (pathname === '/') {
     if (!loaded)
-      return <div style={{ minHeight: '100vh', background: '#1f1f1f' }} />;
+      return (
+        <div style={{ minHeight: '100vh', background: 'var(--page-bg)' }} />
+      );
     if (!user) return <Landing />;
   }
 
   return (
-    <ConfigProvider
-      theme={{
-        algorithm: theme.darkAlgorithm,
-        token: {
-          colorPrimary: '#d71616',
-          colorLink: '#e8e8e8',
-          colorLinkHover: '#ffffff',
-          colorError: '#f0803c',
-          colorTextSecondary: 'rgba(255, 255, 255, 0.7)',
-          colorTextTertiary: 'rgba(255, 255, 255, 0.58)',
-          colorBgLayout: '#1f1f1f',
-          colorBgContainer: '#262626',
-          colorBorder: '#3a3a3a',
-          colorBorderSecondary: '#2f2f2f',
-          fontFamily:
-            "'Jost', system-ui, -apple-system, 'Segoe UI', sans-serif",
-          fontSize: 15,
-          lineHeight: 1.6,
-          borderRadius: 4,
-          controlHeight: 38,
-          padding: 20,
-          paddingLG: 28,
-          paddingXL: 40,
-          margin: 20,
-          marginLG: 28,
-          marginXL: 40,
-        },
-        components: {
-          Layout: {
-            headerBg: '#1a1a1a',
-            siderBg: '#1a1a1a',
-            headerHeight: 64,
-            headerPadding: '0 24px',
-          },
-          Menu: {
-            itemHeight: 44,
-            itemBg: '#1a1a1a',
-            subMenuItemBg: '#1a1a1a',
-          },
-          Card: { headerFontSize: 16 },
-        },
-      }}
-    >
+    <ConfigProvider theme={themeFor(mode)}>
       <App>
         <a href='#main-content' className='skip-link'>
           Skip to content

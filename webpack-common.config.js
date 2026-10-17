@@ -166,7 +166,7 @@ module.exports = {
       meta: {
         viewport: 'width=device-width, initial-scale=1',
         'theme-color': '#1f1f1f',
-        'color-scheme': 'dark',
+        'color-scheme': 'dark light',
       },
       favicon: 'favicon.ico',
       base: '/',

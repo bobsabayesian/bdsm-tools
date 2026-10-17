@@ -1,6 +1,13 @@
 body {
   margin: 0;
-  color-scheme: dark;
+}
+
+html {
+  --focus: #f5f5f5;
+}
+
+html[data-theme='light'] {
+  --focus: #1a1a1a;
 }
 
 // Quick taps, no 300ms wait or double-tap zoom on controls
@@ -48,7 +55,7 @@ textarea {
 
 // Keyboard focus is always visible; mouse clicks don't draw a ring
 :focus-visible {
-  outline: 2px solid #f5f5f5;
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -192,11 +199,6 @@ div .tool-container {
 
 .ant-card-head {
   padding: 16px 24px !important;
-}
-
-.ant-layout-sider .ant-layout-sider-trigger {
-  background: #1a1a1a;
-  border-top: 0;
 }
 
 div[disabled] {

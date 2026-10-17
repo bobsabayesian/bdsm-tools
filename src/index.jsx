@@ -2,6 +2,9 @@ import React from 'react';
 import * as ReactDOM from 'react-dom/client';
 import './style/index.less';
 import Application from './Application';
+import { initTheme } from './state/useTheme';
+
+initTheme();
 
 if (process.env.VERSION !== 'development') {
   const { protocol } = window.location;

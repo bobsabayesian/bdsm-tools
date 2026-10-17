@@ -11,6 +11,7 @@ import {
   Spin,
   Tag,
   Typography,
+  theme,
 } from 'antd';
 import api, { errorMessage, isUnauthorized } from '../services/admin-api';
 
@@ -25,6 +26,7 @@ const TOPIC = {
 const when = (iso) => new Date(iso).toLocaleString();
 
 function Conversation({ message, onChanged, onGone, onLookup, onError }) {
+  const { token } = theme.useToken();
   const [reply, setReply] = React.useState('');
   const [sending, setSending] = React.useState(false);
 
@@ -95,7 +97,10 @@ function Conversation({ message, onChanged, onGone, onLookup, onError }) {
               alignSelf: t.from === 'admin' ? 'flex-end' : 'flex-start',
               maxWidth: '85%',
               padding: '8px 12px',
-              background: t.from === 'admin' ? '#3a1a1a' : '#2f2f2f',
+              background:
+                t.from === 'admin'
+                  ? token.colorErrorBg
+                  : token.colorFillSecondary,
               borderRadius: 4,
               marginLeft: t.from === 'admin' ? 'auto' : 0,
             }}
