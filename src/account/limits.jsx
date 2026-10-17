@@ -1,6 +1,13 @@
 import React from 'react';
 import { Alert, Tag, Typography } from 'antd';
 
+// Mirror SOFT_LIMIT_PROMPT / SOFT_LIMIT_ATTESTATION in worker/limits.js: what the
+// person assigning a task that touches a soft limit sees, and attests to
+export const SOFT_LIMIT_PROMPT =
+  'Assignments should never be a surprise to your partner.';
+export const SOFT_LIMIT_ATTESTATION =
+  "I attest that we've talked about this soft limit.";
+
 /** The scale, from firmest "no" to strongest "yes" (see worker/limits.js) */
 export const LEVELS = [
   { value: 'hard-limit', label: 'Hard limit', color: 'red' },
@@ -39,11 +46,10 @@ export function LimitsNotice({ variant = 'setting', role }) {
                 : 'A task that crosses a hard limit can never be given to you.'}
             </Typography.Paragraph>
             <Typography.Paragraph style={{ margin: '8px 0 0' }}>
-              <b>Soft limits are a conversation, not a setting.</b> The app will
-              not block a task over one, and nobody can click past one.{' '}
+              <b>Soft limits are a conversation, not a setting.</b>{' '}
               {role === 'assigning'
-                ? 'If you are unsure whether a task touches something your partner is wary of, talk to them first.'
-                : 'If a task touches something you are wary of, tell your partner.'}
+                ? 'If a task touches one of your partner’s, you will be asked to attest that you have talked about it, and it is not assigned unless you do. Your attestation is recorded and your partner can see it.'
+                : 'If a task touches one of yours, your partner must attest that you have talked about it before it can be given to you, and you will see that they did. If that is not true, talk to them.'}
             </Typography.Paragraph>
           </>
         }
@@ -61,13 +67,16 @@ export function LimitsNotice({ variant = 'setting', role }) {
           <Typography.Paragraph style={{ margin: 0 }}>
             <LevelTag level='hard-limit' />
             Never assigned. The app will not let anyone give you a task that
-            involves it.
+            involves it. Your partners can see it, so they know.
           </Typography.Paragraph>
           <Typography.Paragraph style={{ margin: '8px 0 0' }}>
             <LevelTag level='soft-limit' />
-            <b>A reason to talk, not a setting.</b> The app will not block it,
-            and nobody can click past it. If you choose one, tell your partner
-            yourself &mdash; it is a conversation for the two of you.
+            <b>A reason to talk.</b> When a task touches one, the person
+            assigning it is shown a flag naming it: &ldquo;{SOFT_LIMIT_PROMPT}
+            &rdquo; They must attest &mdash; &ldquo;{SOFT_LIMIT_ATTESTATION}
+            &rdquo; &mdash; or the task is not assigned. Their attestation is
+            recorded and you can see it. It is still best to tell your partner
+            yourself first.
           </Typography.Paragraph>
         </>
       }

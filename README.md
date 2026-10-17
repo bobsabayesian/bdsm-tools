@@ -102,7 +102,6 @@ private/incognito windows to be logged in as two people at once.
 After signing up, people are asked which body parts they would like **included** in tasks. It is
 deliberately about what someone wants in play, not their anatomy or identity - nobody is asked
 about sex or gender, the quick-start presets only ever add to what is ticked, and skipping is fine.
-Choices are private to the person (`user_selections`) and are not shown to anyone in their dynamics.
 Body parts, their groups and the presets are all editable in the admin tool (`worker/catalogs.js`).
 When writing task text, please use neutral wording ("your", "they") rather than gendered pronouns.
 
@@ -111,13 +110,28 @@ When writing task text, please use neutral wording ("your", "they") rather than 
 Once at least one kink is active in the admin tool, setup gains a second step where people rate
 each kink, separately for **giving** and **receiving**, on a five-point scale: hard limit, soft
 limit, indifferent, like, love (blank means "not decided"). A kink can be limited to one side with
-its "Ask about" setting. Choices are private, like body parts.
+its "Ask about" setting.
 
 - **Hard limits** are enforced by the app: a task is never offered to someone with a hard limit on
   a kink it involves. Tasks list their kinks from the doer's point of view (`kinksReceiving` /
-  `kinksGiving`) and `hardLimitConflicts` in `worker/limits.js` does the check. It is ready for the
-  assignment screens and must never tell an assigner _which_ limit was hit.
-- **Soft limits** are deliberately _not_ a UI choice: the app never blocks on one, flags it as an
-  override, or offers "assign anyway". It is a conversation between the two people. `LimitsNotice`
-  (`src/account/limits.jsx`) says so to both people - on the setup screen now, and with the
-  `task` variant wherever a task is assigned or received.
+  `kinksGiving`) and `hardLimitConflicts` in `worker/limits.js` does the check.
+- **Soft limits** are a conversation, and the person _assigning_ attests to it. When a task touches
+  one, they are shown a flag naming that kink - _"Assignments should never be a surprise to your
+  partner."_ - and must attest _"I attest that we've talked about this soft limit."_ (Yes), or Cancel,
+  in which case nothing is assigned. It is enforced on the server (`assessAssignment` in
+  `worker/limits.js`, which also refuses hard limits whatever is attested), not just by the button;
+  each soft limit needs its own attestation; and the attestation is recorded on the assignment where
+  both people can see it. `LimitsNotice` (`src/account/limits.jsx`) explains all this to both people:
+  on the setup screen now, and with the `task` variant wherever a task is assigned or received.
+
+### Openness within a dynamic
+
+Inside a dynamic **nothing is hidden**: each person sees the other's full profile - body parts and
+kinks, hard and soft limits included (`GET /api/dynamics/:id/profile`, shown on the dynamic's page by
+`PartnerProfile`) - and the setup screens and invitations say so. Three rules go with it:
+
+- It is the person's own profile, identical in every dynamic; it reveals nothing about their other
+  dynamics, and partners still never see a username.
+- It stops when a dynamic ends (like "last active"), and ending or deleting an account removes it.
+- Answers given before this was explained (`users.profile_shared_at` is empty) stay hidden until the
+  person confirms or saves again, so nothing is exposed retroactively.

@@ -21,6 +21,8 @@ const deleteAccount = (password) => call('delete', '/account', { password });
 // Setup choices (body parts, later kinks)
 const getProfile = () => call('get', '/profile');
 const saveChoices = (step, body) => call('put', `/profile/${step}`, body);
+const shareProfile = () => call('post', '/profile/share', {});
+const getPartnerProfile = (id) => call('get', `/dynamics/${id}/profile`);
 const skipStep = (step) => call('post', `/profile/steps/${step}/skip`, {});
 
 // Dynamics
@@ -49,6 +51,8 @@ export default {
   getProfile,
   saveChoices,
   skipStep,
+  shareProfile,
+  getPartnerProfile,
   listDynamics,
   getDynamic,
   startSolo,

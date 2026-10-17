@@ -99,7 +99,9 @@ export default function KinksStep({ onDone }) {
           leave blank is simply not decided.
         </Typography.Paragraph>
         <Typography.Text type='secondary'>
-          Only you can see these choices, and you can change them at any time.
+          The people you&rsquo;re in a dynamic with can see all of these, limits
+          included &mdash; nothing is hidden between you. You can change them at
+          any time.
         </Typography.Text>
         <LimitsNotice variant='setting' />
 

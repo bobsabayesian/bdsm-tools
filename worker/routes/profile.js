@@ -4,8 +4,10 @@ import { catalogs } from '../catalogs';
 import { LEVELS, sidesFor } from '../limits';
 
 /**
- * What a person has chosen to include or avoid. Private to them: nothing here
- * is shown to anyone in their dynamics.
+ * What a person has chosen to include or avoid. Everyone in a dynamic with them
+ * sees all of it (see GET /api/dynamics/:id/profile) - nothing is hidden -
+ * but only once they have seen that said (`profile_shared_at`), and never
+ * after a dynamic has ended.
  *
  * Body parts are about what someone wants *included* in tasks - not a
  * statement of anatomy or identity, and nobody is asked for either. Kinks are
@@ -42,6 +44,13 @@ const availableSteps = async (db) => {
   return available;
 };
 
+const markShared = (db, userId, now) =>
+  db
+    .prepare(
+      'UPDATE users SET profile_shared_at = COALESCE(profile_shared_at, ?) WHERE id = ?',
+    )
+    .bind(now, userId);
+
 const readSteps = async (db, userId) => {
   const row = await db
     .prepare('SELECT profile_steps FROM users WHERE id = ?')
@@ -69,9 +78,16 @@ profile.get('/', async (c) => {
       .all(),
   ]);
 
+  const { profile_shared_at: sharedAt } = await db
+    .prepare('SELECT profile_shared_at FROM users WHERE id = ?')
+    .bind(userId)
+    .first();
+
   const steps = available.map((id) => ({ id, status: done[id] ?? null }));
   return c.json({
     steps,
+    // Answers given before sharing was explained stay hidden until confirmed
+    sharing: { sharedAt, needsReview: !sharedAt && results.length > 0 },
     nextStep: steps.find((step) => !step.status)?.id ?? null,
     selections: Object.fromEntries(
       Object.keys(STEPS).map((id) => [
@@ -141,6 +157,7 @@ profile.put('/:step', async (c) => {
         .bind(userId, step, key, direction, state, now),
     ),
     writeStep(db, userId, await readSteps(db, userId), step, 'done'),
+    markShared(db, userId, now),
   ]);
   return c.body(null, 204);
 });
@@ -155,7 +172,17 @@ profile.post('/steps/:step/skip', async (c) => {
   }
 
   const steps = await readSteps(db, userId);
-  if (steps[step] !== 'done')
-    await writeStep(db, userId, steps, step, 'skipped').run();
+  await db.batch([
+    ...(steps[step] === 'done'
+      ? []
+      : [writeStep(db, userId, steps, step, 'skipped')]),
+    markShared(db, userId, new Date().toISOString()),
+  ]);
+  return c.body(null, 204);
+});
+
+// "I understand my partners can see these" - for answers given before that was said
+profile.post('/share', async (c) => {
+  await markShared(c.env.DB, c.get('user').id, new Date().toISOString()).run();
   return c.body(null, 204);
 });

@@ -302,6 +302,51 @@ dynamics.post('/join', async (c) => {
   return c.json(await loadOne(c, invite.id), 201);
 });
 
+// Everything the other person has chosen: all of it, limits included. Both people
+// in a dynamic see this about each other. It stops when the dynamic ends, and
+// never shows anything from before the person was told it would be shared.
+dynamics.get('/:id/profile', async (c) => {
+  const db = c.env.DB;
+  const found = await loadOne(c, c.req.param('id'));
+  if (
+    !found ||
+    !found.partner ||
+    (found.status !== 'active' && found.status !== 'paused')
+  ) {
+    return c.json({ error: 'Not found' }, 404);
+  }
+
+  const partner = await db
+    .prepare(
+      `SELECT u.id, u.profile_shared_at, u.profile_steps
+       FROM dynamic_members m JOIN users u ON u.id = m.user_id
+       WHERE m.dynamic_id = ? AND m.user_id != ? AND u.deleted_at IS NULL`,
+    )
+    .bind(found.id, c.get('user').id)
+    .first();
+  if (!partner) return c.json({ error: 'Not found' }, 404);
+  if (!partner.profile_shared_at) return c.json({ shared: false });
+
+  const { results } = await db
+    .prepare(
+      'SELECT catalog, key, direction, state FROM user_selections WHERE user_id = ?',
+    )
+    .bind(partner.id)
+    .all();
+  return c.json({
+    shared: true,
+    steps: JSON.parse(partner.profile_steps),
+    selections: {
+      bodyParts: results
+        .filter((row) => row.catalog === 'bodyParts')
+        .map(({ key }) => ({ key })),
+      kinks: results
+        .filter((row) => row.catalog === 'kinks')
+        .map(({ key, direction, state }) => ({ key, direction, state })),
+    },
+  });
+});
+
 // Withdraw an invitation nobody has accepted
 dynamics.delete('/:id', async (c) => {
   const db = c.env.DB;

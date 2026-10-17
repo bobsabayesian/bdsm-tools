@@ -91,7 +91,9 @@ export default function BodyPartsStep({ onDone }) {
           unticked won&rsquo;t be part of a task.
         </Typography.Paragraph>
         <Typography.Text type='secondary'>
-          Only you can see these choices, and you can change them at any time.
+          The people you&rsquo;re in a dynamic with can see these choices
+          &mdash; nothing is hidden between you. You can change them at any
+          time.
         </Typography.Text>
 
         <div>

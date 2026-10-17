@@ -53,7 +53,8 @@ function InviteModal({ open, onClose, onCreated }) {
           <Typography.Paragraph>
             Share this code with them privately. It works once and expires in 7
             days. It will not be shown again, but you can invite them again if
-            you lose it.
+            you lose it. Remember: you and they will be able to see everything
+            about each other here &mdash; body parts, kinks and limits.
           </Typography.Paragraph>
           <Typography.Paragraph
             copyable
@@ -175,6 +176,10 @@ function JoinModal({ open, onClose, onJoined }) {
             <b>{preview.inviterAlias}</b> has invited you to be the{' '}
             <b>{ROLE_LABEL[preview.yourRole]}</b>.
           </Typography.Paragraph>
+          <Typography.Paragraph type='secondary'>
+            In a dynamic you can see everything about each other &mdash; body
+            parts, kinks and limits &mdash; and nothing is hidden between you.
+          </Typography.Paragraph>
           <Form.Item
             label='What should they call you in this dynamic?'
             name='alias'
@@ -233,6 +238,7 @@ export default function Dynamics() {
   const [inviting, setInviting] = React.useState(false);
   const [joining, setJoining] = React.useState(false);
   const [setupPending, setSetupPending] = React.useState(false);
+  const [needsReview, setNeedsReview] = React.useState(false);
 
   const load = () =>
     api
@@ -244,7 +250,10 @@ export default function Dynamics() {
     load();
     api
       .getProfile()
-      .then((profile) => setSetupPending(!!profile.nextStep))
+      .then((profile) => {
+        setSetupPending(!!profile.nextStep);
+        setNeedsReview(profile.sharing.needsReview);
+      })
       .catch(() => {}); // the prompt is a nicety
   }, []);
 
@@ -254,6 +263,37 @@ export default function Dynamics() {
 
   return (
     <>
+      {needsReview && (
+        <Alert
+          type='warning'
+          showIcon
+          style={{ marginBottom: 16 }}
+          title='Your partners can now see your choices'
+          description='You answered these when they were private. In a dynamic everything is open between you, so nothing is shown to anyone until you confirm. Take a look at your choices first if you like.'
+          action={
+            <Space>
+              <Button
+                size='small'
+                onClick={() => navigate('/account/setup/bodyParts')}
+              >
+                Review
+              </Button>
+              <Button
+                size='small'
+                type='primary'
+                onClick={() =>
+                  api
+                    .shareProfile()
+                    .then(() => setNeedsReview(false))
+                    .catch((e) => message.error(errorMessage(e)))
+                }
+              >
+                I understand, share them
+              </Button>
+            </Space>
+          }
+        />
+      )}
       {setupPending && (
         <Alert
           type='info'

@@ -380,6 +380,74 @@ assert.equal(
   "strangers cannot open someone else's dynamic",
 );
 
+step('profiles: both people see each other in full - once it has been said');
+await b.call('PUT', '/profile/bodyParts', { keys: ['mouth', 'pussy'] });
+if (process.env.ADMIN_TOKEN) {
+  await b.call('PUT', '/profile/kinks', {
+    choices: [
+      { key: 'spanking', direction: 'receive', state: 'hard-limit' },
+      { key: 'blindfolds', direction: 'receive', state: 'soft-limit' },
+      { key: 'service', direction: 'give', state: 'love' },
+    ],
+  });
+}
+const seenByAlice = (await a.call('GET', `/dynamics/${abId}/profile`)).json;
+assert.equal(seenByAlice.shared, true);
+assert.deepEqual(seenByAlice.selections.bodyParts.map((x) => x.key).sort(), [
+  'mouth',
+  'pussy',
+]);
+if (process.env.ADMIN_TOKEN) {
+  const states = Object.fromEntries(
+    seenByAlice.selections.kinks.map((k) => [
+      `${k.key}/${k.direction}`,
+      k.state,
+    ]),
+  );
+  assert.deepEqual(
+    states,
+    {
+      'spanking/receive': 'hard-limit',
+      'blindfolds/receive': 'soft-limit',
+      'service/give': 'love',
+    },
+    'limits are shown in full, hard ones included',
+  );
+}
+assert.deepEqual(
+  (await b.call('GET', `/dynamics/${abId}/profile`)).json,
+  { shared: false },
+  'nothing is shown until the person has been told it is shared',
+);
+assert.equal(
+  (await a.call('PUT', '/profile/bodyParts', { keys: ['feet'] })).status,
+  204,
+);
+assert.equal(
+  (await b.call('GET', `/dynamics/${abId}/profile`)).json.selections
+    .bodyParts[0].key,
+  'feet',
+  'it is mutual',
+);
+assert.equal(
+  (await c.call('GET', `/dynamics/${abId}/profile`)).status,
+  404,
+  'strangers see nothing',
+);
+const carolsDynamic = (await c.call('GET', '/dynamics')).json[0];
+const carolSees = await c.call('GET', `/dynamics/${carolsDynamic.id}/profile`);
+assert.deepEqual(
+  carolSees.json.selections.bodyParts.map((x) => x.key).sort(),
+  ['mouth', 'pussy'],
+  'Bob is the same person in every dynamic',
+);
+assert.ok(
+  !/feet|alice/i.test(carolSees.text),
+  "Carol learns nothing about Bob's other dynamic",
+);
+assert.equal((await a.call('POST', '/profile/share', {})).status, 204);
+assert.equal((await a.call('GET', '/profile')).json.sharing.needsReview, false);
+
 step('pause: only the person who paused can resume');
 const resumeOn = new Date(Date.now() + 3 * 864e5).toISOString();
 const paused = await b.call('POST', `/dynamics/${abId}/pause`, {
@@ -421,6 +489,13 @@ const frozen = (await a.call('GET', `/dynamics/${abId}`)).json.partner
 assert.ok(frozen);
 assert.equal((await a.call('POST', `/dynamics/${abId}/pause`, {})).status, 409);
 assert.equal((await a.call('POST', `/dynamics/${abId}/end`, {})).status, 409);
+
+assert.equal(
+  (await a.call('GET', `/dynamics/${abId}/profile`)).status,
+  404,
+  'nothing is visible once a dynamic has ended',
+);
+assert.equal((await b.call('GET', `/dynamics/${abId}/profile`)).status, 404);
 
 step('solo mode');
 assert.equal(

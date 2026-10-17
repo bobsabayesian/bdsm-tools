@@ -16,6 +16,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import api, { errorMessage } from '../services/account-api';
 import useAccount from '../state/useAccount';
+import PartnerProfile from './PartnerProfile';
 import PauseEndDialog from './PauseEndDialog';
 import { EventSummary, LastActive, ROLE_LABEL, StatusTag } from './common';
 
@@ -208,6 +209,10 @@ export default function DynamicView() {
           </Popconfirm>
         )}
       </Space>
+
+      {partner && (status === 'active' || status === 'paused') && (
+        <PartnerProfile dynamic={dynamic} />
+      )}
 
       {(status === 'active' || status === 'paused') && (
         <Card size='small' style={{ maxWidth: 520, marginBottom: 24 }}>
