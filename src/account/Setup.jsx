@@ -7,17 +7,14 @@ import useCatalog from '../hooks/useCatalog';
 import api, { errorMessage } from '../services/account-api';
 import useAccount from '../state/useAccount';
 
-const LAST_GROUP = 'Other';
-
+// Groups appear in the order their first part does (the catalog is already in order)
 function groupParts(parts) {
   const groups = new Map();
   for (const part of parts) {
-    const name = part.group || LAST_GROUP;
+    const name = part.group || 'Other';
     groups.set(name, [...(groups.get(name) ?? []), part]);
   }
-  return [...groups].sort(([a], [b]) =>
-    a === LAST_GROUP ? 1 : b === LAST_GROUP ? -1 : a.localeCompare(b),
-  );
+  return [...groups];
 }
 
 /**
@@ -40,15 +37,21 @@ export default function Setup() {
     refresh();
   }, []);
 
+  const loggedIn = !!user;
   React.useEffect(() => {
-    if (!user) return;
+    if (!loggedIn) return;
     api
       .getProfile()
       .then((profile) =>
-        setChosen(new Set(profile.selections.bodyParts.map(({ key }) => key))),
+        // Only the first answer counts: ticks made while this was loading must survive
+        setChosen(
+          (current) =>
+            current ??
+            new Set(profile.selections.bodyParts.map(({ key }) => key)),
+        ),
       )
       .catch((e) => message.error(errorMessage(e)));
-  }, [user]);
+  }, [loggedIn]);
 
   if (!loaded || (user && (chosen === null || loadingParts))) {
     return <Spin size='large' />;
@@ -57,7 +60,7 @@ export default function Setup() {
     return (
       <>
         <PageHeader title='Setting up' />
-        <Alert type='info' message='Please log in to set up your profile.' />
+        <Alert type='info' title='Please log in to set up your profile.' />
         <Button style={{ marginTop: 16 }} onClick={() => navigate('/account')}>
           Log in
         </Button>
@@ -66,7 +69,13 @@ export default function Setup() {
   }
 
   const finish = () => navigate('/account');
-  const add = (keys) => setChosen((old) => new Set([...old, ...keys]));
+  // A part an admin has switched off can still be named by a preset or an
+  // earlier choice; only parts on offer can be ticked or saved
+  const offered = new Set(parts.map((part) => part.value));
+  const add = (keys) =>
+    setChosen(
+      (old) => new Set([...old, ...keys.filter((key) => offered.has(key))]),
+    );
   const toggle = (key, on) =>
     setChosen((old) => {
       const next = new Set(old);
@@ -77,7 +86,7 @@ export default function Setup() {
 
   const save = () => {
     setSaving(true);
-    const keys = [...chosen];
+    const keys = [...chosen].filter((key) => offered.has(key));
     api
       .saveChoices('bodyParts', keys)
       .then(() => {
@@ -96,23 +105,24 @@ export default function Setup() {
 
   return (
     <>
-      <PageHeader title='What would you like included?' />
-      <Space direction='vertical' size='middle' style={{ maxWidth: 640 }}>
+      <PageHeader title='What would you like included in your tasks?' />
+      <Space orientation='vertical' size='middle' style={{ maxWidth: 640 }}>
         <Typography.Paragraph>
-          Tasks can involve different parts of the body. Tick the ones
-          you&rsquo;re happy to have included. This is about what you want in
-          play, not about who you are &mdash; you never need to explain your
-          body or identity. Anything left unticked won&rsquo;t be part of a
-          task.
+          Tasks can involve different parts of your body, voice, or personal
+          presentation. Tick the ones you&rsquo;re happy to have included. This
+          is strictly about <b>what you want in play</b>, not about who you are
+          &mdash; you never need to explain your body or identity. Anything left
+          unticked won&rsquo;t be part of a task.
         </Typography.Paragraph>
         <Typography.Text type='secondary'>
-          Only you can see these choices, and you can change them any time.
+          Only you can see these choices, and you can change them at any time.
         </Typography.Text>
 
         <div>
           <Typography.Text strong>Quick start</Typography.Text>{' '}
           <Typography.Text type='secondary'>
-            (these only add to what&rsquo;s ticked, so you can mix them)
+            (shortcuts only add to what&rsquo;s already ticked, so you can mix
+            and match freely)
           </Typography.Text>
           <Space wrap style={{ marginTop: 8 }}>
             {presets.map((preset) => (
@@ -137,7 +147,13 @@ export default function Setup() {
                     checked={chosen.has(part.value)}
                     onChange={(e) => toggle(part.value, e.target.checked)}
                   >
-                    {part.label}
+                    <b>{part.label}</b>
+                    {part.description && (
+                      <Typography.Text type='secondary'>
+                        {' '}
+                        <i>({part.description})</i>
+                      </Typography.Text>
+                    )}
                   </Checkbox>
                 </div>
               ))}

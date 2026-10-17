@@ -14,7 +14,9 @@ catalog.get('/:name', async (c) => {
   if (!definition?.public) return c.json({ error: 'Not found' }, 404);
 
   const items = await listDocs(c.env.DB, definition.collection, {
-    orderBy: "json_extract(doc, '$.label')",
+    // Catalogs with a position (such as body parts) keep it; the rest are alphabetical
+    orderBy:
+      "COALESCE(json_extract(doc, '$.order'), 1000000), json_extract(doc, '$.label')",
   });
   c.header('Cache-Control', 'public, max-age=60');
   return c.json(

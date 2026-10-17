@@ -46,7 +46,7 @@ function AuthForm({ name, action, button, children }) {
       style={{ maxWidth: 400 }}
     >
       {error && (
-        <Alert type='error' message={error} style={{ marginBottom: 16 }} />
+        <Alert type='error' title={error} style={{ marginBottom: 16 }} />
       )}
       {children}
       <Button type='primary' htmlType='submit' loading={loading}>
@@ -186,7 +186,7 @@ function RecoveryCodeModal({ code, onDone }) {
       open
       title='Keep your recovery code safe'
       closable={false}
-      maskClosable={false}
+      mask={{ closable: false }}
       keyboard={false}
       cancelButtonProps={{ style: { display: 'none' } }}
       okText='Continue'

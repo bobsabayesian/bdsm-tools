@@ -8,7 +8,14 @@ const fetchCatalog = (name) => {
   if (!requests[name]) {
     requests[name] = axios
       .get(`/api/catalog/${name}`)
-      .then((res) => res.data.sort(alphabeticalSort(({ label }) => label)))
+      .then((res) => {
+        // Items with a position keep the order the server gives; others are alphabetical
+        const positioned = res.data.some(
+          (item) => typeof item.order === 'number',
+        );
+        if (positioned) return res.data;
+        return res.data.sort(alphabeticalSort(({ label }) => label));
+      })
       .catch((e) => {
         delete requests[name]; // allow a retry next time
         throw e;

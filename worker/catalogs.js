@@ -116,6 +116,12 @@ const catalogs = {
     'catalog-body-parts',
     [
       {
+        name: 'order',
+        label: 'Position',
+        type: 'number',
+        help: 'Lower numbers are shown first on the setup screen',
+      },
+      {
         name: 'group',
         label: 'Group',
         type: 'string',

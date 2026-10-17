@@ -22,7 +22,7 @@ function Login({ onLogin, error }) {
       }}
     >
       {error && (
-        <Alert type='error' message={error} style={{ marginBottom: 16 }} />
+        <Alert type='error' title={error} style={{ marginBottom: 16 }} />
       )}
       <Form.Item
         label='Admin token'

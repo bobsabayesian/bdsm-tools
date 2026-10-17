@@ -81,7 +81,7 @@ function InviteModal({ open, onClose, onCreated }) {
           }}
         >
           {error && (
-            <Alert type='error' message={error} style={{ marginBottom: 16 }} />
+            <Alert type='error' title={error} style={{ marginBottom: 16 }} />
           )}
           <Form.Item label='You will be the' name='role'>
             <Radio.Group>
@@ -135,7 +135,7 @@ function JoinModal({ open, onClose, onJoined }) {
       footer={null}
     >
       {error && (
-        <Alert type='error' message={error} style={{ marginBottom: 16 }} />
+        <Alert type='error' title={error} style={{ marginBottom: 16 }} />
       )}
       {!preview ? (
         <Form
@@ -213,7 +213,7 @@ function DynamicCard({ dynamic, onOpen }) {
       extra={<StatusTag status={status} />}
       style={{ marginBottom: 12 }}
     >
-      <Space direction='vertical' size={2} style={{ width: '100%' }}>
+      <Space orientation='vertical' size={2} style={{ width: '100%' }}>
         <Typography.Text type='secondary'>
           You: {ROLE_LABEL[you.role]}, as &ldquo;{you.alias}&rdquo;
         </Typography.Text>
@@ -259,7 +259,7 @@ export default function Dynamics() {
           type='info'
           showIcon
           style={{ marginBottom: 16 }}
-          message='Finish setting up your profile'
+          title='Finish setting up your profile'
           description='Choose which body parts you would like included in tasks. It takes a minute and you can change it later.'
           action={
             <Button

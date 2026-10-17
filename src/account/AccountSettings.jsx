@@ -35,7 +35,7 @@ function ChangePassword() {
       }}
     >
       {error && (
-        <Alert type='error' message={error} style={{ marginBottom: 16 }} />
+        <Alert type='error' title={error} style={{ marginBottom: 16 }} />
       )}
       <Form.Item
         label='Current password'
@@ -95,7 +95,7 @@ function DeleteAccount() {
   return (
     <>
       {error && (
-        <Alert type='error' message={error} style={{ marginBottom: 16 }} />
+        <Alert type='error' title={error} style={{ marginBottom: 16 }} />
       )}
       <Button danger onClick={confirm}>
         Delete my account
@@ -117,7 +117,7 @@ export default function AccountSettings() {
           key: 'account',
           label: `Account (${user.username})`,
           children: (
-            <Space direction='vertical' size='large'>
+            <Space orientation='vertical' size='large'>
               <Button onClick={() => api.logout().finally(() => setUser(null))}>
                 Log out
               </Button>

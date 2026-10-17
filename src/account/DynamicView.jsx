@@ -91,7 +91,7 @@ export default function DynamicView() {
     return (
       <>
         <PageHeader title='My dynamics' onBack={back} />
-        <Alert type='info' message='Please log in to see this.' />
+        <Alert type='info' title='Please log in to see this.' />
         <Button style={{ marginTop: 16 }} onClick={back}>
           Log in
         </Button>
@@ -102,7 +102,7 @@ export default function DynamicView() {
     return (
       <>
         <PageHeader title='My dynamics' onBack={back} />
-        <Alert type='warning' message={error} />
+        <Alert type='warning' title={error} />
       </>
     );
   }
@@ -129,7 +129,7 @@ export default function DynamicView() {
           type='warning'
           showIcon
           style={{ marginBottom: 16 }}
-          message={
+          title={
             <EventSummary
               dynamic={dynamic}
               event={history.find((e) => e.type === 'paused')}
@@ -148,7 +148,7 @@ export default function DynamicView() {
           type='info'
           showIcon
           style={{ marginBottom: 16 }}
-          message={
+          title={
             <EventSummary
               dynamic={dynamic}
               event={history.find((e) => e.type === 'ended')}
@@ -171,7 +171,7 @@ export default function DynamicView() {
         </Descriptions.Item>
         {partner && (
           <Descriptions.Item label={partner.alias}>
-            <Space direction='vertical' size={0}>
+            <Space orientation='vertical' size={0}>
               <span>{ROLE_LABEL[partner.role]}</span>
               <LastActive dynamic={dynamic} />
             </Space>
