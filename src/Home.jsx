@@ -27,13 +27,6 @@ export default function Home() {
         >
           Scene Negotiations
         </Button>
-        <Button
-          size='large'
-          style={{ marginRight: 40 }}
-          onClick={() => navigate('/tools/bdsm-scenarios')}
-        >
-          Scenario Picker
-        </Button>
       </div>
     </div>
   );

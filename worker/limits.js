@@ -8,7 +8,7 @@
  *                (SOFT_LIMIT_PROMPT, SOFT_LIMIT_ATTESTATION). Without the
  *                attestation the task is not assigned. The app trusts an
  *                adult's word but records it, and both people can see it.
- * - indifferent / like / love: preferences that help a pair find things
+ * - indifferent / interested / like / love: preferences that help a pair find things
  *                they will enjoy.
  *
  * Not answering is simply "not decided".
@@ -17,6 +17,7 @@ export const LEVELS = [
   'hard-limit',
   'soft-limit',
   'indifferent',
+  'interested',
   'like',
   'love',
 ];

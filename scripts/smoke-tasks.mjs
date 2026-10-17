@@ -27,12 +27,17 @@ class Person {
     const text = await res.text();
     return { status: res.status, json: text ? JSON.parse(text) : null, text };
   }
-  async signup() {
+  // A display name is required to be in a dynamic: Zak, Sara and Sam
+  async signup(displayName) {
     const r = await this.call('POST', '/account/signup', {
       username: this.name,
       password: PASSWORD,
     });
     assert.equal(r.status, 201);
+    const named = await this.call('PUT', '/profile/display-name', {
+      displayName,
+    });
+    assert.equal(named.status, 204);
     return this;
   }
 }
@@ -51,9 +56,9 @@ const admin = async (path, data) => {
 };
 const step = (name) => console.log('•', name);
 
-const dom = await new Person('dom').signup();
-const sub = await new Person('sub').signup();
-const stranger = await new Person('stranger').signup();
+const dom = await new Person('dom').signup('Zak');
+const sub = await new Person('sub').signup('Sara');
+const stranger = await new Person('stranger').signup('Sam');
 
 step('a pair, with a sub who has set up a profile');
 const invite = (
@@ -144,13 +149,13 @@ assert.deepEqual(tasks.you, {
   role: 'sub',
   canAssign: false,
   isAssignee: true,
-  partner: 'Sir',
+  partner: 'Zak',
 });
 assert.deepEqual((await dom.call('GET', `${P}/tasks`)).json.you, {
   role: 'dom',
   canAssign: true,
   isAssignee: false,
-  partner: 'kitten',
+  partner: 'Sara',
 });
 
 step('tasks wait until the other person has been through profile setup');
@@ -788,8 +793,8 @@ const thread = (await dom.call('GET', `${P}/comments?target=${target}`)).json;
 assert.deepEqual(
   thread.map((c) => [c.by, c.alias, c.body]),
   [
-    ['them', 'kitten', 'Could it be by 9am?'],
-    ['you', 'Sir', 'Yes, let us talk tonight'],
+    ['them', 'Sara', 'Could it be by 9am?'],
+    ['you', 'Zak', 'Yes, let us talk tonight'],
   ],
 );
 assert.equal(

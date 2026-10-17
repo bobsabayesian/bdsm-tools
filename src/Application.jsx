@@ -26,43 +26,10 @@ import ConsentModal from './components/ConsentModal';
 import { convertMongoTimestamp } from './util';
 import UpdateChecker from './UpdateChecker';
 import api from './services/feature-flag-api';
-import ScenarioTable from './scenario-picker/ScenarioTable';
-import ScenarioEntry from './scenario-picker/ScenarioEntry';
-import NegotiationFormWrapper from './scene-negotiation/NegotiationFormWrapper';
-import ViewingTemplates from './scene-negotiation/ViewingTemplates';
-import TubePlanViewer from './tube-clamp-planner/TubePlanViewer';
-import TubePlannerDashboard from './tube-clamp-planner/TubePlannerDashboard';
+import ComingSoon from './scene-negotiation/ComingSoon';
 import MobileUserWarning from './components/MobileUserWarning';
 
 ReactGA.initialize('G-SKBSEEBLCP');
-
-const SceneNegotiationEntry = React.lazy(
-  () =>
-    import(
-      /* webpackChunkName: "SceneNegotiation", webpackPrefetch: true */ './scene-negotiation/Entry'
-    ),
-);
-
-const ScenarioPickerEntry = React.lazy(
-  () =>
-    import(
-      /* webpackChunkName: "ScenarioPicker", webpackPrefetch: true */ './scenario-picker/Entry'
-    ),
-);
-
-const SlaveTrainingEntry = React.lazy(
-  () =>
-    import(
-      /* webpackChunkName: "SlaveTraining", webpackPrefetch: true */ './slave-training/Entry'
-    ),
-);
-
-const TubePlannerEntry = React.lazy(
-  () =>
-    import(
-      /* webpackChunkName: "TubePlanner", webpackPrefetch: true */ './tube-clamp-planner/Entry'
-    ),
-);
 
 const AdminEntry = React.lazy(
   () => import(/* webpackChunkName: "Admin" */ './admin/Entry'),
@@ -129,19 +96,7 @@ export default function Application() {
           <Route path='about/faq' element={<FaqEntry />} />
           <Route path='about/info' element={<AboutEntry />} />
           <Route path='tools' element={<FeatureFlagLayout />}>
-            <Route path='scene-negotiation' element={<SceneNegotiationEntry />}>
-              <Route index element={<ViewingTemplates />} />
-              <Route path=':type' element={<NegotiationFormWrapper />} />
-            </Route>
-            <Route path='bdsm-scenarios' element={<ScenarioPickerEntry />}>
-              <Route index element={<ScenarioTable />} />
-              <Route path=':type' element={<ScenarioEntry />} />
-            </Route>
-            <Route path='slave-training' element={<SlaveTrainingEntry />} />
-            <Route path='tube-planner' element={<TubePlannerEntry />}>
-              <Route index element={<TubePlannerDashboard />} />
-              <Route path=':sceneId' element={<TubePlanViewer />} />
-            </Route>
+            <Route path='scene-negotiation' element={<ComingSoon />} />
           </Route>
         </Route>
       </Routing>

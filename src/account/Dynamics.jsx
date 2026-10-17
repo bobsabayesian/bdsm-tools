@@ -75,12 +75,12 @@ function InviteModal({ open, onClose, onCreated, displayName }) {
           // starts again if the saved name turns up after the dialog opened
           key={displayName}
           layout='vertical'
-          initialValues={{ role: 'dom', alias: displayName || undefined }}
-          onFinish={({ role, alias }) => {
+          initialValues={{ role: 'dom', name: displayName || undefined }}
+          onFinish={({ role, name, alias }) => {
             setSaving(true);
             setError(null);
             api
-              .invite(role, alias)
+              .invite(role, name, alias)
               .then((created) => {
                 setInvite(created);
                 onCreated();
@@ -99,10 +99,21 @@ function InviteModal({ open, onClose, onCreated, displayName }) {
             </Radio.Group>
           </Form.Item>
           <Form.Item
-            label='What should they call you in this dynamic?'
-            name='alias'
-            extra='Only they will see this. Your username stays private.'
+            label='Your name here'
+            name='name'
+            extra='What they call you. Only they will see this; your username stays private.'
             rules={aliasRules}
+          >
+            <Input maxLength={40} />
+          </Form.Item>
+          <Form.Item
+            label='Your title'
+            name='alias'
+            extra='For example Sir, Mistress or Kitten.'
+            rules={[
+              { required: true, message: 'Choose a title' },
+              { max: 40, message: 'At most 40 characters' },
+            ]}
           >
             <Input maxLength={40} />
           </Form.Item>
@@ -172,10 +183,10 @@ function JoinModal({ open, onClose, onJoined, displayName }) {
         <Form
           key={displayName}
           layout='vertical'
-          initialValues={{ alias: displayName || undefined }}
-          onFinish={({ alias }) =>
+          initialValues={{ name: displayName || undefined }}
+          onFinish={({ name, alias }) =>
             run(
-              api.joinDynamic(code, alias).then((joined) => {
+              api.joinDynamic(code, name, alias).then((joined) => {
                 close();
                 onJoined(joined);
               }),
@@ -183,7 +194,7 @@ function JoinModal({ open, onClose, onJoined, displayName }) {
           }
         >
           <Typography.Paragraph>
-            <b>{preview.inviterAlias}</b> has invited you to be the{' '}
+            <b>{preview.inviterName}</b> has invited you to be the{' '}
             <b>{ROLE_LABEL[preview.yourRole]}</b>.
           </Typography.Paragraph>
           <Typography.Paragraph type='secondary'>
@@ -191,12 +202,23 @@ function JoinModal({ open, onClose, onJoined, displayName }) {
             parts, kinks and limits &mdash; and nothing is hidden between you.
           </Typography.Paragraph>
           <Form.Item
-            label='What should they call you in this dynamic?'
-            name='alias'
-            extra='Only they will see this. Your username stays private.'
+            label='Your name here'
+            name='name'
+            extra='What they call you. Only they will see this; your username stays private.'
             rules={aliasRules}
           >
             <Input maxLength={40} autoFocus />
+          </Form.Item>
+          <Form.Item
+            label='Your title'
+            name='alias'
+            extra='For example Sir, Mistress or Kitten.'
+            rules={[
+              { required: true, message: 'Choose a title' },
+              { max: 40, message: 'At most 40 characters' },
+            ]}
+          >
+            <Input maxLength={40} />
           </Form.Item>
           <Space>
             <Button type='primary' htmlType='submit' loading={saving}>
@@ -263,17 +285,26 @@ export default function Dynamics({ displayName = '' }) {
         My dynamics
       </Typography.Title>
       <Space wrap style={{ marginBottom: 24 }}>
-        <Button type='primary' onClick={() => setInviting(true)}>
+        <Button
+          type='primary'
+          disabled={!displayName}
+          onClick={() => setInviting(true)}
+        >
           Invite someone
         </Button>
-        <Button onClick={() => setJoining(true)}>Join with a code</Button>
+        <Button disabled={!displayName} onClick={() => setJoining(true)}>
+          Join with a code
+        </Button>
         <Button
-          disabled={(dynamics ?? []).some(
-            (d) => d.kind === 'solo' && d.status !== 'ended',
-          )}
+          disabled={
+            !displayName ||
+            (dynamics ?? []).some(
+              (d) => d.kind === 'solo' && d.status !== 'ended',
+            )
+          }
           onClick={() =>
             api
-              .startSolo(displayName || undefined)
+              .startSolo(displayName)
               .then(open)
               .catch((e) => message.error(errorMessage(e)))
           }

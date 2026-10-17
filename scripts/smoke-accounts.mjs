@@ -29,11 +29,21 @@ class Person {
     const text = await res.text();
     return { status: res.status, text, json: text ? JSON.parse(text) : null };
   }
-  signup() {
-    return this.call('POST', '/account/signup', {
+  // Everyone needs a display name before they can be in a dynamic, so by default
+  // sign-up also sets one: 'alice-account' -> 'Alice'
+  async signup({ named = true } = {}) {
+    const result = await this.call('POST', '/account/signup', {
       username: this.name,
       password: PASSWORD,
     });
+    if (named && result.status === 201) {
+      const first = this.name.split('-')[0];
+      this.display = first[0].toUpperCase() + first.slice(1);
+      await this.call('PUT', '/profile/display-name', {
+        displayName: this.display,
+      });
+    }
+    return result;
   }
 }
 
@@ -371,7 +381,7 @@ assert.deepEqual(profile.me, {
   pronouns: [],
   about: '',
   ruleChangeMinDays: 7,
-  displayName: '',
+  displayName: 'Bob',
 });
 assert.equal(
   (await b.call('PUT', '/profile/me', { genders: ['nonsense'] })).status,
@@ -405,7 +415,7 @@ assert.deepEqual((await b.call('GET', '/profile')).json.me, {
   pronouns: ['they/them', 'she/her'],
   about: 'I like a plan.',
   ruleChangeMinDays: 7,
-  displayName: '',
+  displayName: 'Bob',
 });
 assert.equal(
   (await b.call('PUT', '/profile/me', {})).status,
@@ -451,12 +461,25 @@ assert.equal(
 );
 assert.equal(
   (await b.call('PUT', '/profile/me', { displayName: '' })).status,
-  204,
+  400,
+  'a display name is required, so it cannot be cleared',
+);
+assert.equal(
+  (await b.call('PUT', '/profile/display-name', { displayName: '  ' })).status,
+  400,
+);
+assert.equal(
+  (
+    await b.call('PUT', '/profile/display-name', {
+      displayName: 'x'.repeat(41),
+    })
+  ).status,
+  400,
 );
 assert.equal(
   (await b.call('GET', '/profile')).json.me.displayName,
-  '',
-  'an empty name clears it',
+  'Bob',
+  'still there',
 );
 assert.equal(
   (
@@ -514,7 +537,7 @@ assert.equal(
 );
 
 step(
-  "kinks: the real list, the five-point scale, and what each section's sides mean",
+  "kinks: the real list, the six-point scale, and what each section's sides mean",
 );
 const allKinks = await catalogOf('kinks');
 const kink = Object.fromEntries(allKinks.map((k) => [k.value, k]));
@@ -616,7 +639,7 @@ assert.equal(
   (await put([{ key: 'discipline', direction: 'receive', state: 'maybe' }]))
     .status,
   400,
-  'only the five levels exist',
+  'only the six levels exist',
 );
 assert.equal(
   (await put([{ key: 'discipline', direction: 'any', state: 'like' }])).status,
@@ -660,6 +683,7 @@ assert.equal(
         direction: 'any',
         state: 'indifferent',
       },
+      { key: 'dirty-talk', direction: 'give', state: 'interested' },
     ])
   ).status,
   204,
@@ -673,6 +697,7 @@ assert.deepEqual(answers, {
   'discipline/receive': 'hard-limit',
   'aftercare/receive': 'soft-limit',
   'exhibitionism-voyeurism/any': 'indifferent',
+  'dirty-talk/give': 'interested',
 });
 assert.equal(profile.nextStep, null);
 assert.deepEqual(
@@ -712,6 +737,7 @@ assert.equal(
 );
 assert.deepEqual((await b.call('POST', '/dynamics/preview', { code })).json, {
   inviterAlias: 'Sir',
+  inviterName: 'Alice',
   yourRole: 'sub',
 });
 const joined = await b.call('POST', '/dynamics/join', {
@@ -721,13 +747,68 @@ const joined = await b.call('POST', '/dynamics/join', {
 assert.equal(joined.status, 201);
 assert.equal(joined.json.status, 'active');
 assert.equal(joined.json.you.role, 'sub');
-assert.equal(joined.json.partner.alias, 'Sir');
+assert.equal(joined.json.partner.alias, 'Sir', 'a title');
+assert.equal(
+  joined.json.partner.name,
+  'Alice',
+  'and a name (the display name by default)',
+);
+assert.deepEqual(
+  [joined.json.you.alias, joined.json.you.name],
+  ['kitten', 'Bob'],
+);
 assert.equal(
   (await c.call('POST', '/dynamics/join', { code, alias: 'x' })).status,
   404,
   'invite codes are single-use',
 );
 const abId = joined.json.id;
+
+step('two people in a dynamic cannot start another together');
+const again = await a.call('POST', '/dynamics/invite', {
+  role: 'dom',
+  alias: 'Sir',
+});
+const second = await b.call('POST', '/dynamics/join', {
+  code: again.json.code,
+  alias: 'kitten',
+});
+assert.equal(second.status, 409);
+assert.equal(second.json.code, 'already-together');
+assert.equal(
+  (await a.call('DELETE', `/dynamics/${again.json.id}`)).status,
+  204,
+  'the unused invitation can be withdrawn',
+);
+assert.equal(
+  (await b.call('GET', '/dynamics')).json.filter((d) => d.status !== 'ended')
+    .length,
+  1,
+  'still just the one',
+);
+
+step('a display name is required to be in a dynamic');
+const unnamed = new Person('unnamed-account');
+assert.equal((await unnamed.signup({ named: false })).status, 201);
+for (const [path, data] of [
+  ['/dynamics/solo', {}],
+  ['/dynamics/invite', { role: 'dom', alias: 'Sir' }],
+  ['/dynamics/join', { code: 'AAAA-AAAA-AAAA-AAAA', alias: 'kitten' }],
+]) {
+  const refused = await unnamed.call('POST', path, data);
+  assert.equal(refused.status, 409, path);
+  assert.equal(refused.json.code, 'display-name-required', path);
+}
+assert.equal(
+  (await unnamed.call('PUT', '/profile/display-name', { displayName: 'Una' }))
+    .status,
+  204,
+);
+assert.equal(
+  (await unnamed.call('POST', '/dynamics/solo', {})).status,
+  201,
+  'and fine once it is set',
+);
 
 step('Bob has a second dynamic with Carol; Alice must not learn of it');
 const invite2 = await b.call('POST', '/dynamics/invite', {

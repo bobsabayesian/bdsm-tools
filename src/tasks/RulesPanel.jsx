@@ -298,6 +298,12 @@ export default function RulesPanel({ dynamicId, paused, solo }) {
 
   return (
     <>
+      <Alert
+        type='info'
+        title='Why rules'
+        style={{ marginBottom: 16 }}
+        description='Rules are a guiding force for stability in a dynamic. Setting smart limits on how often they can change ensures both partners understand and discuss before changes.'
+      />
       {!you.canAssign && (
         <Alert
           type='info'

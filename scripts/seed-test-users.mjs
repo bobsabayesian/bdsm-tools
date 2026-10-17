@@ -53,6 +53,10 @@ for (const username of USERS) {
   if (result.status >= 300)
     throw new Error(`${username}: ${JSON.stringify(result.json)}`);
   sessions[username] = result.cookie;
+  // a display name is required before anyone can be in a dynamic
+  await call(result.cookie, 'PUT', '/profile/display-name', {
+    displayName: username.split('-')[0],
+  });
 }
 
 // ---- demo kinks and tasks (needs the admin token)

@@ -76,9 +76,10 @@ Catalogs are defined in `worker/catalogs.js` - adding an entry there adds it to 
 
 People sign up with a username and password (no email). The recovery code shown once at sign-up
 is the only way to reset a forgotten password. A person can be in any number of **dynamics**
-(a pair, or just themselves) and nobody is told about the others: partners see only the alias
-chosen for that dynamic, never a username or user id. People join by invitation code rather than
-by searching for each other.
+(a pair, or just themselves) and nobody is told about the others: partners see only the name and
+title chosen for that dynamic (a required display name such as "Zak, or Sara (without an H)", and
+a title such as "Sir"), never a username or user id. Two people can share only one active dynamic.
+People join by invitation code rather than by searching for each other.
 
 Either person can pause or end a dynamic at any time, with nobody's approval. They are invited to
 say why but never required to. While a dynamic runs each person sees the other's last-active time;
@@ -131,7 +132,7 @@ dynamic's page (`PartnerProfile`).
 ### Kinks and limits
 
 The kinks list (194 items in 24 sections, loaded by `migrations/0014_kinks_list.sql`; editable in admin) is
-rated on a five-point scale - hard limit, soft limit, indifferent, like, love (blank means "not decided") -
+rated on a six-point scale - hard limit, soft limit, indifferent, interested, like, love (blank means "not decided") -
 once for **each side** of a kink. What the two sides mean comes from each section's "Applicable to" line and is
 kept on the kinks as labels: Giving / Receiving, **As Dominant / As submissive**, **As aggressor / As target**,
 **As actor / As subject**, or **Partner / Self** for the fantasy sections. Themes with no sides (groupings,

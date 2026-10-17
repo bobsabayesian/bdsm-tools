@@ -80,3 +80,11 @@ export const downloadJSON = (jsonData, filename = 'download.json') => {
 // The distance multiplier when moving at 45°
 export const _45_DEGREE_DISTANCE_MULTIPLIER =
   Math.sqrt(Math.pow(1, 2) + Math.pow(1, 2)) / 2;
+
+/** Back to the top of the page (the app scrolls inside .content, not the window) */
+export const scrollToTop = () => {
+  const content = document.querySelector('.content');
+  if (content && content.scrollTo)
+    content.scrollTo({ top: 0, behavior: 'smooth' });
+  if (window.scrollTo) window.scrollTo({ top: 0, behavior: 'smooth' });
+};

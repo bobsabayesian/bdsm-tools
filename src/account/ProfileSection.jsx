@@ -105,6 +105,24 @@ export default function ProfileSection({ profile, onChanged }) {
           }
         />
       )}
+      {!profile.me.displayName && (
+        <Alert
+          type='warning'
+          showIcon
+          style={{ marginBottom: 16 }}
+          title='Add your display name'
+          description='You need a display name before you can invite someone, join a dynamic or start on your own.'
+          action={
+            <Button
+              size='small'
+              type='primary'
+              onClick={() => navigate('/account/about/me')}
+            >
+              Add it
+            </Button>
+          }
+        />
+      )}
       {profile.nextStep && (
         <Alert
           type='info'

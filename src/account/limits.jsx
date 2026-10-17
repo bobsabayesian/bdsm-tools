@@ -13,6 +13,7 @@ export const LEVELS = [
   { value: 'hard-limit', label: 'Hard limit', color: 'red' },
   { value: 'soft-limit', label: 'Soft limit', color: 'orange' },
   { value: 'indifferent', label: 'Indifferent', color: 'default' },
+  { value: 'interested', label: 'Interested', color: 'cyan' },
   { value: 'like', label: 'Like', color: 'green' },
   { value: 'love', label: 'Love', color: 'magenta' },
 ];

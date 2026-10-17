@@ -17,11 +17,12 @@ const row = (key, direction, state) => ({
   state,
 });
 
-test('the scale runs from hard limit to love', () => {
+test('the scale runs from hard limit to love, with "interested" between indifferent and like', () => {
   assert.deepEqual(LEVELS, [
     'hard-limit',
     'soft-limit',
     'indifferent',
+    'interested',
     'like',
     'love',
   ]);

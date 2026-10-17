@@ -1,8 +1,10 @@
 import React from 'react';
 import { Alert, App, Button, Checkbox, Space, Spin, Typography } from 'antd';
 import { Link } from 'react-router-dom';
-import { PlusOutlined } from '@ant-design/icons';
 import Cookies from 'js-cookie';
+import { scrollToTop } from '../util';
+import PresetButton from './PresetButton';
+import SaveActions from './SaveActions';
 import PageHeader from '../components/PageHeader';
 import useCatalog from '../hooks/useCatalog';
 import api, { errorMessage } from '../services/account-api';
@@ -106,6 +108,10 @@ export default function BoundsStep({ onDone, embedded = false, onDirty }) {
       (preset[field] ?? []).map((key) => idOf(catalog, key)),
     ).filter((id) => offered.has(id));
   const quickStarts = presets.filter((p) => presetIds(p).length > 0);
+  const remove = (ids) =>
+    setChosen((old) => new Set([...old].filter((id) => !ids.includes(id))));
+  // a quick start is "in" once everything it names is ticked; half-ticked adds the rest
+  const isIn = (preset) => presetIds(preset).every((id) => chosen.has(id));
 
   const save = () => {
     setSaving(true);
@@ -126,12 +132,15 @@ export default function BoundsStep({ onDone, embedded = false, onDirty }) {
         const kept = new Set([...chosen].filter((id) => offered.has(id)));
         setChosen(kept);
         setSaved(kept);
+        scrollToTop();
         if (embedded) message.success('Saved');
         else onDone();
       })
       .catch((e) => message.error(errorMessage(e)))
       .finally(() => setSaving(false));
   };
+  // Save is active once something is added (or, on a saved screen, changed)
+  const canSave = embedded ? !sameSet(chosen, saved) : chosen.size > 0;
   const skip = () =>
     Promise.all(shown.map(({ catalog }) => api.skipStep(catalog)))
       .then(onDone)
@@ -157,6 +166,12 @@ export default function BoundsStep({ onDone, embedded = false, onDirty }) {
           The people you&rsquo;re in a dynamic with can see these choices
           &mdash; nothing is hidden between you. You can change them any time.
         </Typography.Text>
+        <SaveActions
+          canSave={canSave}
+          saving={saving}
+          onSave={save}
+          onSkip={embedded ? undefined : skip}
+        />
         <Alert
           type='info'
           showIcon
@@ -185,13 +200,13 @@ export default function BoundsStep({ onDone, embedded = false, onDirty }) {
           </Typography.Text>
           <Space wrap style={{ marginTop: 8 }}>
             {quickStarts.map((preset) => (
-              <Button
+              <PresetButton
                 key={preset.value}
-                icon={<PlusOutlined />}
-                onClick={() => add(presetIds(preset))}
-              >
-                Add: {preset.label}
-              </Button>
+                label={preset.label}
+                active={isIn(preset)}
+                onAdd={() => add(presetIds(preset))}
+                onRemove={() => remove(presetIds(preset))}
+              />
             ))}
             <Button onClick={() => add([...offered])}>Select everything</Button>
             <Button onClick={() => setChosen(new Set())}>Clear all</Button>
@@ -229,12 +244,12 @@ export default function BoundsStep({ onDone, embedded = false, onDirty }) {
           </div>
         ))}
 
-        <Space>
-          <Button type='primary' loading={saving} onClick={save}>
-            Save
-          </Button>
-          {!embedded && <Button onClick={skip}>Skip for now</Button>}
-        </Space>
+        <SaveActions
+          canSave={canSave}
+          saving={saving}
+          onSave={save}
+          onSkip={embedded ? undefined : skip}
+        />
       </Space>
     </>
   );

@@ -1,6 +1,9 @@
 import React from 'react';
 import { Alert, App, Button, Checkbox, Space, Spin, Typography } from 'antd';
 import { Link } from 'react-router-dom';
+import { scrollToTop } from '../util';
+import PresetButton from './PresetButton';
+import SaveActions from './SaveActions';
 import Cookies from 'js-cookie';
 import PageHeader from '../components/PageHeader';
 import useCatalog from '../hooks/useCatalog';
@@ -61,6 +64,13 @@ export default function BodyPartsStep({ onDone, embedded = false, onDirty }) {
     setChosen(
       (old) => new Set([...old, ...keys.filter((key) => offered.has(key))]),
     );
+  const remove = (keys) =>
+    setChosen((old) => new Set([...old].filter((key) => !keys.includes(key))));
+  // a quick start is "in" once everything it names (that is on offer) is ticked
+  const isIn = (preset) => {
+    const named = preset.parts.filter((key) => offered.has(key));
+    return named.length > 0 && named.every((key) => chosen.has(key));
+  };
   const toggle = (key, on) =>
     setChosen((old) => {
       const next = new Set(old);
@@ -79,12 +89,15 @@ export default function BodyPartsStep({ onDone, embedded = false, onDirty }) {
         Cookies.set('body-parts', keys.join('|'), { SameSite: 'Lax' });
         setChosen(new Set(keys));
         setSaved(new Set(keys));
+        scrollToTop();
         if (embedded) message.success('Saved');
         else onDone();
       })
       .catch((e) => message.error(errorMessage(e)))
       .finally(() => setSaving(false));
   };
+  // Save is active once something is added (or, on a saved screen, changed)
+  const canSave = embedded ? !sameKeys(chosen, saved) : chosen.size > 0;
   const skip = () =>
     api
       .skipStep('bodyParts')
@@ -113,6 +126,12 @@ export default function BodyPartsStep({ onDone, embedded = false, onDirty }) {
           &mdash; nothing is hidden between you. You can change them at any
           time.
         </Typography.Text>
+        <SaveActions
+          canSave={canSave}
+          saving={saving}
+          onSave={save}
+          onSkip={embedded ? undefined : skip}
+        />
         <Alert
           type='info'
           showIcon
@@ -140,9 +159,13 @@ export default function BodyPartsStep({ onDone, embedded = false, onDirty }) {
           </Typography.Text>
           <Space wrap style={{ marginTop: 8 }}>
             {presets.map((preset) => (
-              <Button key={preset.value} onClick={() => add(preset.parts)}>
-                Add: {preset.label}
-              </Button>
+              <PresetButton
+                key={preset.value}
+                label={preset.label}
+                active={isIn(preset)}
+                onAdd={() => add(preset.parts)}
+                onRemove={() => remove(preset.parts)}
+              />
             ))}
             <Button onClick={() => add(parts.map((part) => part.value))}>
               Select everything
@@ -175,12 +198,12 @@ export default function BodyPartsStep({ onDone, embedded = false, onDirty }) {
           </div>
         ))}
 
-        <Space>
-          <Button type='primary' loading={saving} onClick={save}>
-            Save
-          </Button>
-          {!embedded && <Button onClick={skip}>Skip for now</Button>}
-        </Space>
+        <SaveActions
+          canSave={canSave}
+          saving={saving}
+          onSave={save}
+          onSkip={embedded ? undefined : skip}
+        />
       </Space>
     </>
   );

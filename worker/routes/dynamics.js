@@ -31,6 +31,40 @@ const cleanAlias = (alias, fallback) => {
   return trimmed.length >= 1 && trimmed.length <= 40 ? trimmed : null;
 };
 
+// Everyone needs a display name before they can be in a dynamic
+const displayNameOf = async (db, userId) =>
+  (
+    await db
+      .prepare('SELECT display_name FROM users WHERE id = ?')
+      .bind(userId)
+      .first()
+  )?.display_name || null;
+
+const needsName = (c) =>
+  c.json(
+    {
+      error:
+        'Add your display name (under My profile) before starting or joining a dynamic',
+      code: 'display-name-required',
+    },
+    409,
+  );
+
+/**
+ * The name and title someone takes into a dynamic. The name defaults to their
+ * display name; the title (Sir, kitten...) is chosen here and `titleFallback` is
+ * used when none is given (null: it is required).
+ */
+const readNames = async (c, input, titleFallback) => {
+  const displayName = await displayNameOf(c.env.DB, c.get('user').id);
+  if (!displayName) return { missing: true };
+  const name = cleanAlias(input.name, displayName);
+  const title = cleanAlias(input.alias, titleFallback);
+  if (!name) return { error: 'Name must be 1-40 characters' };
+  if (!title) return { error: 'Title must be 1-40 characters' };
+  return { name, title };
+};
+
 const placeholders = (items) => items.map(() => '?').join(',');
 
 /** Pauses with a "resume on" date lift themselves once the date arrives */
@@ -71,7 +105,7 @@ const loadDynamics = async (db, userId, id) => {
   const { results: mine } = await db
     .prepare(
       `SELECT d.id, d.kind, d.status, d.resume_on, d.created_at, d.ended_at, d.invite_expires,
-              m.role, m.alias
+              m.role, m.alias, m.name
        FROM dynamics d JOIN dynamic_members m ON m.dynamic_id = d.id
        WHERE m.user_id = ?1 AND (?2 IS NULL OR d.id = ?2)
        ORDER BY d.created_at DESC LIMIT ${MAX_LISTED}`,
@@ -84,7 +118,7 @@ const loadDynamics = async (db, userId, id) => {
   const [{ results: others }, { results: events }] = await Promise.all([
     db
       .prepare(
-        `SELECT m.dynamic_id, m.role, m.alias, m.last_active_frozen, u.last_active_at, u.deleted_at
+        `SELECT m.dynamic_id, m.role, m.alias, m.name, m.last_active_frozen, u.last_active_at, u.deleted_at
          FROM dynamic_members m JOIN users u ON u.id = m.user_id
          WHERE m.dynamic_id IN (${placeholders(ids)}) AND m.user_id != ?`,
       )
@@ -123,10 +157,13 @@ const loadDynamics = async (db, userId, id) => {
       endedAt: d.ended_at,
       resumeOn: d.resume_on,
       inviteExpires: d.status === 'invited' ? d.invite_expires : undefined,
-      you: { role: d.role, alias: d.alias },
+      you: { role: d.role, alias: d.alias, name: d.name ?? d.alias },
       partner: other && {
         role: other.role,
         alias: other.deleted_at ? 'Deleted account' : other.alias,
+        name: other.deleted_at
+          ? 'Deleted account'
+          : (other.name ?? other.alias),
         // Live while the dynamic is going; frozen at the moment it ended
         lastActive:
           d.status === 'ended'
@@ -159,9 +196,9 @@ dynamics.get('/:id', async (c) => {
 dynamics.post('/solo', async (c) => {
   const db = c.env.DB;
   const user = c.get('user');
-  const { alias } = await body(c);
-  const name = cleanAlias(alias, 'Me');
-  if (!name) return c.json({ error: 'Name must be 1-40 characters' }, 400);
+  const names = await readNames(c, await body(c), 'Me');
+  if (names.missing) return needsName(c);
+  if (names.error) return c.json({ error: names.error }, 400);
 
   const existing = await db
     .prepare(
@@ -183,9 +220,9 @@ dynamics.post('/solo', async (c) => {
       .bind(id, now),
     db
       .prepare(
-        `INSERT INTO dynamic_members (dynamic_id, user_id, role, alias, joined_at) VALUES (?, ?, 'self', ?, ?)`,
+        `INSERT INTO dynamic_members (dynamic_id, user_id, role, alias, name, joined_at) VALUES (?, ?, 'self', ?, ?, ?)`,
       )
-      .bind(id, user.id, name, now),
+      .bind(id, user.id, names.title, names.name, now),
   ]);
   return c.json(await loadOne(c, id), 201);
 });
@@ -195,12 +232,14 @@ dynamics.post('/solo', async (c) => {
 dynamics.post('/invite', async (c) => {
   const db = c.env.DB;
   const user = c.get('user');
-  const { role, alias } = await body(c);
-  if (role !== 'dom' && role !== 'sub') {
+  const input = await body(c);
+  if (input.role !== 'dom' && input.role !== 'sub') {
     return c.json({ error: 'Role must be "dom" or "sub"' }, 400);
   }
-  const name = cleanAlias(alias, null);
-  if (!name) return c.json({ error: 'Name must be 1-40 characters' }, 400);
+  const role = input.role;
+  const names = await readNames(c, input, null);
+  if (names.missing) return needsName(c);
+  if (names.error) return c.json({ error: names.error }, 400);
 
   if (await overLimit(db, `invite:${user.id}`, 10, 24 * HOUR)) {
     return c.json({ error: 'Too many invitations today' }, 429);
@@ -223,9 +262,9 @@ dynamics.post('/invite', async (c) => {
       ),
     db
       .prepare(
-        `INSERT INTO dynamic_members (dynamic_id, user_id, role, alias, joined_at) VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO dynamic_members (dynamic_id, user_id, role, alias, name, joined_at) VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .bind(id, user.id, role, name, now),
+      .bind(id, user.id, role, names.title, names.name, now),
   ]);
   return c.json({ ...(await loadOne(c, id)), code }, 201);
 });
@@ -237,7 +276,7 @@ const findInvite = async (c, code) => {
 
   const invite = await db
     .prepare(
-      `SELECT d.id, m.user_id AS inviter_id, m.role AS inviter_role, m.alias AS inviter_alias
+      `SELECT d.id, m.user_id AS inviter_id, m.role AS inviter_role, m.alias AS inviter_alias, m.name AS inviter_name
        FROM dynamics d JOIN dynamic_members m ON m.dynamic_id = d.id
        WHERE d.invite_hash = ? AND d.status = 'invited' AND d.invite_expires > ?`,
     )
@@ -258,6 +297,7 @@ dynamics.post('/preview', async (c) => {
   if (!invite) return c.json({ error: INVALID_CODE }, 404);
   return c.json({
     inviterAlias: invite.inviter_alias,
+    inviterName: invite.inviter_name ?? invite.inviter_alias,
     yourRole: invite.inviter_role === 'dom' ? 'sub' : 'dom',
   });
 });
@@ -265,15 +305,37 @@ dynamics.post('/preview', async (c) => {
 dynamics.post('/join', async (c) => {
   const db = c.env.DB;
   const user = c.get('user');
-  const { code, alias } = await body(c);
-  const name = cleanAlias(alias, null);
-  if (!name) return c.json({ error: 'Name must be 1-40 characters' }, 400);
+  const input = await body(c);
+  const names = await readNames(c, input, null);
+  if (names.missing) return needsName(c);
+  if (names.error) return c.json({ error: names.error }, 400);
 
   if (await overLimit(db, `join:${user.id}`, 10, HOUR)) {
     return c.json({ error: 'Too many attempts. Please wait a while.' }, 429);
   }
-  const invite = await findInvite(c, code);
+  const invite = await findInvite(c, input.code);
   if (!invite) return c.json({ error: INVALID_CODE }, 404);
+
+  // Two people can only be in one dynamic together at a time
+  const already = await db
+    .prepare(
+      `SELECT 1 FROM dynamics d
+       JOIN dynamic_members a ON a.dynamic_id = d.id AND a.user_id = ?1
+       JOIN dynamic_members b ON b.dynamic_id = d.id AND b.user_id = ?2
+       WHERE d.kind = 'pair' AND d.status IN ('active', 'paused')`,
+    )
+    .bind(user.id, invite.inviter_id)
+    .first();
+  if (already) {
+    return c.json(
+      {
+        error:
+          'You are already in a dynamic with this person. End that one first if you want to start another.',
+        code: 'already-together',
+      },
+      409,
+    );
+  }
 
   const now = new Date().toISOString();
   // A batch runs as one transaction, so of two people redeeming the same code
@@ -281,15 +343,16 @@ dynamics.post('/join', async (c) => {
   const [claim] = await db.batch([
     db
       .prepare(
-        `INSERT INTO dynamic_members (dynamic_id, user_id, role, alias, joined_at)
-         SELECT ?1, ?2, ?3, ?4, ?5
+        `INSERT INTO dynamic_members (dynamic_id, user_id, role, alias, name, joined_at)
+         SELECT ?1, ?2, ?3, ?4, ?5, ?6
          WHERE EXISTS (SELECT 1 FROM dynamics WHERE id = ?1 AND status = 'invited')`,
       )
       .bind(
         invite.id,
         user.id,
         invite.inviter_role === 'dom' ? 'sub' : 'dom',
-        name,
+        names.title,
+        names.name,
         now,
       ),
     db
@@ -384,13 +447,19 @@ dynamics.delete('/:id', async (c) => {
 dynamics.put('/:id/me', async (c) => {
   const found = await loadOne(c, c.req.param('id'));
   if (!found) return c.json({ error: 'Not found' }, 404);
-  const name = cleanAlias((await body(c)).alias, null);
+  const input = await body(c);
+  // either or both can be sent; what is left out stays as it is
+  const title =
+    input.alias === undefined ? found.you.alias : cleanAlias(input.alias, null);
+  const name =
+    input.name === undefined ? found.you.name : cleanAlias(input.name, null);
+  if (!title) return c.json({ error: 'Title must be 1-40 characters' }, 400);
   if (!name) return c.json({ error: 'Name must be 1-40 characters' }, 400);
 
   await c.env.DB.prepare(
-    'UPDATE dynamic_members SET alias = ? WHERE dynamic_id = ? AND user_id = ?',
+    'UPDATE dynamic_members SET alias = ?, name = ? WHERE dynamic_id = ? AND user_id = ?',
   )
-    .bind(name, found.id, c.get('user').id)
+    .bind(title, name, found.id, c.get('user').id)
     .run();
   return c.json(await loadOne(c, found.id));
 });

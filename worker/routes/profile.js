@@ -158,6 +158,28 @@ profile.get('/', async (c) => {
   });
 });
 
+// Just the display name - required before anyone can be in a dynamic. (Setting it
+// is not the same as having seen that partners can see the rest of a profile, so
+// this does not count as agreeing to that.)
+profile.put('/display-name', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const name =
+    typeof body.displayName === 'string'
+      ? // eslint-disable-next-line no-control-regex
+        body.displayName.replace(/[\u0000-\u001f]/g, '').trim()
+      : '';
+  if (!name || name.length > MAX_DISPLAY_NAME) {
+    return c.json(
+      { error: 'A display name of 1-40 characters is required' },
+      400,
+    );
+  }
+  await c.env.DB.prepare('UPDATE users SET display_name = ? WHERE id = ?')
+    .bind(name, c.get('user').id)
+    .run();
+  return c.body(null, 204);
+});
+
 // The "Me" tab: { genders: [keys], pronouns: [text], about: text } - all optional
 profile.put('/me', async (c) => {
   const db = c.env.DB;
@@ -193,6 +215,7 @@ profile.put('/me', async (c) => {
     about.length > MAX_ABOUT ||
     minDays === null ||
     displayName === null ||
+    displayName === '' ||
     (displayName !== undefined && displayName.length > MAX_DISPLAY_NAME)
   ) {
     return c.json({ error: 'Invalid details' }, 400);

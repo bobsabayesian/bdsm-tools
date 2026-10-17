@@ -139,10 +139,10 @@ export default function PartnerProfile({ dynamic }) {
   }, [dynamic.id]);
 
   const cardStyle = { maxWidth: 760, marginBottom: 24 };
-  const title = `About ${partner.alias}`;
+  const title = `About ${partner.name}`;
   const intro = (
     <Typography.Text type='secondary'>
-      {partner.alias} can see the same about you.
+      {partner.name} can see the same about you.
     </Typography.Text>
   );
 
@@ -151,7 +151,7 @@ export default function PartnerProfile({ dynamic }) {
     return (
       <Card size='small' title={title} style={cardStyle}>
         <Typography.Paragraph type='secondary'>
-          {partner.alias} hasn&rsquo;t filled in their profile yet.
+          {partner.name} hasn&rsquo;t filled in their profile yet.
         </Typography.Paragraph>
         {intro}
       </Card>
@@ -168,7 +168,7 @@ export default function PartnerProfile({ dynamic }) {
   const answeredKinks = kinks.filter((k) =>
     selections.kinks.some((a) => a.key === k.value),
   );
-  const nobody = `${partner.alias} hasn’t chosen yet.`;
+  const nobody = `${partner.name} hasn’t chosen yet.`;
 
   const items = [
     {
@@ -199,7 +199,7 @@ export default function PartnerProfile({ dynamic }) {
           )}
           {myGenders.length === 0 && me.pronouns.length === 0 && !me.about && (
             <Nothing>
-              {partner.alias} hasn&rsquo;t shared anything else here.
+              {partner.name} hasn&rsquo;t shared anything else here.
             </Nothing>
           )}
           <div>
@@ -299,7 +299,7 @@ export default function PartnerProfile({ dynamic }) {
             children:
               steps.kinks !== 'done' ? (
                 <Nothing>
-                  {partner.alias} hasn&rsquo;t answered the kinks yet.
+                  {partner.name} hasn&rsquo;t answered the kinks yet.
                 </Nothing>
               ) : answeredKinks.length === 0 ? (
                 <Nothing>No answers.</Nothing>

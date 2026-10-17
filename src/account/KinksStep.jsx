@@ -14,9 +14,11 @@ import {
   theme,
   Typography,
 } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
+import { scrollToTop } from '../util';
+import PresetButton from './PresetButton';
+import SaveActions from './SaveActions';
 import useCatalog from '../hooks/useCatalog';
 import api, { errorMessage } from '../services/account-api';
 import { sideName, sidesOf } from './kinkText';
@@ -81,7 +83,7 @@ function KinkRow({ kink, answers, onSet }) {
 }
 
 /**
- * Setup step and tab: how someone feels about each kink, on the five-point scale,
+ * Setup step and tab: how someone feels about each kink, on the six-point scale,
  * for each side it has. Leaving one blank means "not decided", which is fine.
  *
  * It is a long list, so it is made easy to take in: sections that fold away with
@@ -151,6 +153,26 @@ export default function KinksStep({ onDone, embedded = false, onDirty }) {
       return next;
     });
 
+  // A quick start is "in" once every answer it covers is "Like"; "Remove" clears
+  // only those Likes, never a stronger answer someone has given
+  const presetSlots = (preset) =>
+    preset.kinks.flatMap((key) => {
+      const kink = kinks.find((k) => k.value === key);
+      return kink ? sidesOf(kink).map((side) => slotId(key, side)) : [];
+    });
+  const isIn = (preset) => {
+    const slots = presetSlots(preset);
+    return slots.length > 0 && slots.every((id) => answers[id] === 'like');
+  };
+  const removePreset = (preset) =>
+    setAnswers((old) => {
+      const next = { ...old };
+      for (const id of presetSlots(preset)) {
+        if (next[id] === 'like') delete next[id];
+      }
+      return next;
+    });
+
   // Everything left unanswered in one section
   const fillRest = (sectionKinks, level) =>
     setAnswers((old) => {
@@ -184,12 +206,15 @@ export default function KinksStep({ onDone, embedded = false, onDirty }) {
         );
         setAnswers(kept);
         setSaved(normalise(kept));
+        scrollToTop();
         if (embedded) message.success('Saved');
         else onDone();
       })
       .catch((e) => message.error(errorMessage(e)))
       .finally(() => setSaving(false));
   };
+  // Save is active once something is answered (or, on a saved screen, changed)
+  const canSave = embedded ? normalise(answers) !== saved : answered > 0;
   const skip = () =>
     api
       .skipStep('kinks')
@@ -310,6 +335,12 @@ export default function KinksStep({ onDone, embedded = false, onDirty }) {
             </>
           }
         />
+        <SaveActions
+          canSave={canSave}
+          saving={saving}
+          onSave={save}
+          onSkip={embedded ? undefined : skip}
+        />
         <LimitsNotice variant='setting' />
 
         <div>
@@ -350,13 +381,13 @@ export default function KinksStep({ onDone, embedded = false, onDirty }) {
             </Typography.Text>
             <Space wrap style={{ marginTop: 8 }}>
               {presets.map((preset) => (
-                <Button
+                <PresetButton
                   key={preset.value}
-                  icon={<PlusOutlined />}
-                  onClick={() => applyPreset(preset)}
-                >
-                  Add: {preset.label}
-                </Button>
+                  label={preset.label}
+                  active={isIn(preset)}
+                  onAdd={() => applyPreset(preset)}
+                  onRemove={() => removePreset(preset)}
+                />
               ))}
             </Space>
           </div>
@@ -391,11 +422,13 @@ export default function KinksStep({ onDone, embedded = false, onDirty }) {
           }}
         >
           <Space>
-            <Button type='primary' loading={saving} onClick={save}>
-              Save
-            </Button>
+            <SaveActions
+              canSave={canSave}
+              saving={saving}
+              onSave={save}
+              onSkip={embedded ? undefined : skip}
+            />
             <Button onClick={() => setAnswers({})}>Clear all</Button>
-            {!embedded && <Button onClick={skip}>Skip for now</Button>}
           </Space>
         </div>
       </Space>

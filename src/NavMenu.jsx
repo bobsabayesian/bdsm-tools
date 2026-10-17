@@ -8,9 +8,6 @@ import {
   InfoCircleOutlined,
   HomeOutlined,
   BulbOutlined,
-  ProfileOutlined,
-  TeamOutlined,
-  EditOutlined,
   CheckSquareOutlined,
   FileTextOutlined,
 } from '@ant-design/icons';
@@ -58,24 +55,6 @@ export default function NavMenu({ vertical = false }) {
                   <Link to='/tools/scene-negotiation'>Scene Negotiation</Link>
                 ),
                 icon: <FileDoneOutlined />,
-              },
-              {
-                key: 'bdsm-scenarios',
-                title: 'Scenario Picker',
-                label: <Link to='/tools/bdsm-scenarios'>Scenario Picker</Link>,
-                icon: <ProfileOutlined />,
-              },
-              {
-                key: 'slave-training',
-                title: 'Slave Training',
-                label: <Link to='/tools/slave-training'>Slave Training</Link>,
-                icon: <TeamOutlined />,
-              },
-              {
-                key: 'tube-planner',
-                title: 'Tube Clamp Planner',
-                label: <Link to='/tools/tube-planner'>Tube Clamp Planner</Link>,
-                icon: <EditOutlined />,
               },
             ],
           },

@@ -22,6 +22,8 @@ const deleteAccount = (password) => call('delete', '/account', { password });
 const getProfile = () => call('get', '/profile');
 const saveChoices = (step, body) => call('put', `/profile/${step}`, body);
 const saveMe = (me) => call('put', '/profile/me', me);
+const saveDisplayName = (displayName) =>
+  call('put', '/profile/display-name', { displayName });
 const shareProfile = () => call('post', '/profile/share', {});
 const getPartnerProfile = (id) => call('get', `/dynamics/${id}/profile`);
 const skipStep = (step) => call('post', `/profile/steps/${step}/skip`, {});
@@ -29,14 +31,16 @@ const skipStep = (step) => call('post', `/profile/steps/${step}/skip`, {});
 // Dynamics
 const listDynamics = () => call('get', '/dynamics');
 const getDynamic = (id) => call('get', `/dynamics/${id}`);
-const startSolo = (alias) => call('post', '/dynamics/solo', { alias });
-const invite = (role, alias) =>
-  call('post', '/dynamics/invite', { role, alias });
+const startSolo = (name, alias) =>
+  call('post', '/dynamics/solo', { name, alias });
+const invite = (role, name, alias) =>
+  call('post', '/dynamics/invite', { role, name, alias });
 const previewInvite = (code) => call('post', '/dynamics/preview', { code });
-const joinDynamic = (code, alias) =>
-  call('post', '/dynamics/join', { code, alias });
+const joinDynamic = (code, name, alias) =>
+  call('post', '/dynamics/join', { code, name, alias });
 const withdrawInvite = (id) => call('delete', `/dynamics/${id}`);
-const setAlias = (id, alias) => call('put', `/dynamics/${id}/me`, { alias });
+const setAlias = (id, name, alias) =>
+  call('put', `/dynamics/${id}/me`, { name, alias });
 const pause = (id, details) => call('post', `/dynamics/${id}/pause`, details);
 const resume = (id) => call('post', `/dynamics/${id}/resume`, {});
 const end = (id, details) => call('post', `/dynamics/${id}/end`, details);
@@ -53,6 +57,7 @@ export default {
   saveChoices,
   skipStep,
   saveMe,
+  saveDisplayName,
   shareProfile,
   getPartnerProfile,
   listDynamics,

@@ -29,21 +29,35 @@ import {
 
 function MyName({ dynamic, onSaved }) {
   const { message } = App.useApp();
-  const [alias, setAlias] = React.useState(dynamic.you.alias);
+  const [name, setName] = React.useState(dynamic.you.name);
+  const [alias, setAlias] = React.useState(dynamic.you.alias ?? '');
+  const unchanged =
+    name.trim() === dynamic.you.name &&
+    alias.trim() === (dynamic.you.alias ?? '');
 
   return (
-    <Space.Compact>
+    <Space wrap>
+      <Input
+        value={name}
+        maxLength={40}
+        aria-label='Name'
+        placeholder='Name'
+        onChange={(e) => setName(e.target.value)}
+        style={{ width: 180 }}
+      />
       <Input
         value={alias}
         maxLength={40}
+        aria-label='Title'
+        placeholder='Title'
         onChange={(e) => setAlias(e.target.value)}
-        style={{ width: 200 }}
+        style={{ width: 180 }}
       />
       <Button
-        disabled={!alias.trim() || alias.trim() === dynamic.you.alias}
+        disabled={!name.trim() || !alias.trim() || unchanged}
         onClick={() =>
           api
-            .setAlias(dynamic.id, alias)
+            .setAlias(dynamic.id, name, alias)
             .then((updated) => {
               onSaved(updated);
               message.success('Saved');
@@ -53,7 +67,7 @@ function MyName({ dynamic, onSaved }) {
       >
         Save
       </Button>
-    </Space.Compact>
+    </Space>
   );
 }
 
@@ -204,15 +218,15 @@ export default function DynamicView() {
         <Descriptions.Item label='You are'>
           {ROLE_LABEL[you.role]}
         </Descriptions.Item>
-        <Descriptions.Item label='Your name here'>
+        <Descriptions.Item label='Your name and title here'>
           {status === 'ended' ? (
-            you.alias
+            dynamicTitle({ ...dynamic, partner: null, kind: 'solo' })
           ) : (
             <MyName dynamic={dynamic} onSaved={setDynamic} />
           )}
         </Descriptions.Item>
         {partner && (
-          <Descriptions.Item label={partner.alias}>
+          <Descriptions.Item label={partner.name}>
             <Space orientation='vertical' size={0}>
               <span>{ROLE_LABEL[partner.role]}</span>
               <LastActive dynamic={dynamic} />

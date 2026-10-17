@@ -3,14 +3,18 @@ import { Tag, Tooltip, Typography } from 'antd';
 import moment from 'moment';
 
 /**
- * What a dynamic is called: your name in it, then your partner's - "Sir - Bob".
+ * What a dynamic is called: your name (and title) in it, then your partner's - "Bob (Sir) - Sara".
  * (Alone, just your name; "Me" is the default and reads better as "Just me".)
  */
 export const dynamicTitle = (dynamic) => {
   const { kind, you, partner } = dynamic;
-  if (kind === 'solo') return you.alias === 'Me' ? 'Just me' : you.alias;
-  if (!partner) return `${you.alias} - waiting for someone to join`;
-  return `${you.alias} - ${partner.alias}`;
+  const label = (who) =>
+    who.alias && who.alias !== who.name
+      ? `${who.name} (${who.alias})`
+      : who.name;
+  if (kind === 'solo') return you.alias === 'Me' ? 'Just me' : label(you);
+  if (!partner) return `${label(you)} - waiting for someone to join`;
+  return `${label(you)} - ${label(partner)}`;
 };
 
 export const ROLE_LABEL = { dom: 'Dominant', sub: 'Submissive', self: 'Solo' };
@@ -60,7 +64,7 @@ export function LastActive({ dynamic }) {
 
 const WHO = (dynamic) => ({
   you: 'You',
-  them: dynamic.partner ? dynamic.partner.alias : 'They',
+  them: dynamic.partner ? dynamic.partner.name : 'They',
   system: 'It',
 });
 

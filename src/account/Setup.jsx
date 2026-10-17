@@ -6,6 +6,7 @@ import api from '../services/account-api';
 import useAccount from '../state/useAccount';
 import BodyPartsStep from './BodyPartsStep';
 import BoundsStep from './BoundsStep';
+import NameStep from './NameStep';
 import KinksStep from './KinksStep';
 
 // My Body is one screen; body & anatomy, clothing, items and spaces together are
@@ -69,6 +70,19 @@ export default function Setup() {
       </>
     );
   }
+
+  // A display name comes first: nothing else works without one
+  if (!profile.me.displayName)
+    return (
+      <NameStep
+        onDone={() =>
+          api
+            .getProfile()
+            .then(setProfile)
+            .catch(() => {})
+        }
+      />
+    );
 
   // Which screen to show: the one asked for, or the first not yet dealt with
   const current = profile.nextStep;

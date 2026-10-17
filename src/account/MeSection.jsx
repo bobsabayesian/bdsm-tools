@@ -9,6 +9,8 @@ import {
   Spin,
   Typography,
 } from 'antd';
+import SaveActions from './SaveActions';
+import { scrollToTop } from '../util';
 import useCatalog from '../hooks/useCatalog';
 import api, { errorMessage } from '../services/account-api';
 
@@ -66,12 +68,14 @@ export default function MeSection({ onDirty }) {
         const kept = { ...me, about: me.about.trim() };
         setMe(kept);
         setSaved(normalise(kept));
+        scrollToTop();
         message.success('Saved');
       })
       .catch((e) => message.error(errorMessage(e)))
       .finally(() => setSaving(false));
   };
 
+  const canSave = !!me.displayName?.trim() && normalise(me) !== saved;
   const offeredGenders = new Set(genders.map((g) => g.value));
 
   return (
@@ -87,24 +91,25 @@ export default function MeSection({ onDirty }) {
           know about you. Everything here is optional, and nothing else depends
           on it.
         </Typography.Paragraph>
+        <SaveActions canSave={canSave} saving={saving} onSave={save} />
         <Typography.Text type='secondary'>
           They can see this &mdash; nothing is hidden between you. You can
           change it at any time.
         </Typography.Text>
 
         <div>
-          <Typography.Text strong>Display name</Typography.Text>
+          <Typography.Text strong>Display name (required)</Typography.Text>
           <Typography.Paragraph type='secondary' style={{ margin: 0 }}>
-            The name filled in for you when you start or join a dynamic, so it
-            shows up as, say, &ldquo;Sir - Bob&rdquo;. You can use a different
-            name in each dynamic, and the people in one only ever see the name
-            you use with them.
+            What the people you&rsquo;re in a dynamic with call you, for example
+            &ldquo;Zak, or Sara (without an H)&rdquo;. It is not your title:
+            titles like &ldquo;Sir&rdquo; are chosen separately for each
+            dynamic. You can use a different name in each dynamic too.
           </Typography.Paragraph>
           <Input
             maxLength={40}
             style={{ marginTop: 4, maxWidth: 320 }}
             aria-label='Display name'
-            placeholder='e.g. Sir'
+            placeholder='e.g. Zak, or Sara (without an H)'
             value={me.displayName ?? ''}
             onChange={(e) => setMe({ ...me, displayName: e.target.value })}
           />
@@ -197,9 +202,7 @@ export default function MeSection({ onDirty }) {
           </Space>
         </div>
 
-        <Button type='primary' loading={saving} onClick={save}>
-          Save
-        </Button>
+        <SaveActions canSave={canSave} saving={saving} onSave={save} />
       </Space>
     </>
   );

@@ -45,7 +45,7 @@ const guard = async (c, { write = false } = {}) => {
 
   const { results } = await db
     .prepare(
-      `SELECT d.id, d.kind, d.status, m.user_id, m.role, m.alias
+      `SELECT d.id, d.kind, d.status, m.user_id, m.role, m.alias, m.name
        FROM dynamics d JOIN dynamic_members m ON m.dynamic_id = d.id
        WHERE d.id = ?`,
     )
@@ -78,8 +78,11 @@ const guard = async (c, { write = false } = {}) => {
       assignee,
       canAssign: controller.user_id === userId,
       isAssignee: assignee.user_id === userId,
-      alias: (uid) =>
-        results.find((r) => r.user_id === uid)?.alias ?? 'Someone',
+      // people are spoken of by name (Zak), not title (Sir)
+      alias: (uid) => {
+        const found = results.find((r) => r.user_id === uid);
+        return found ? (found.name ?? found.alias) : 'Someone';
+      },
     },
   };
 };
@@ -97,7 +100,7 @@ const assigneeReady = async (c, m) => {
     ? null
     : c.json(
         {
-          error: `${m.assignee.alias} hasn’t finished setting up their profile yet`,
+          error: `${m.assignee.name ?? m.assignee.alias} hasn’t finished setting up their profile yet`,
           code: 'profile-not-shared',
         },
         409,
@@ -789,7 +792,13 @@ dynamicWork.post('/:id/comments', async (c) => {
     .bind(id, m.id, target.type, target.id, m.me.user_id, text, now)
     .run();
   return c.json(
-    { id, body: text, createdAt: now, by: 'you', alias: m.me.alias },
+    {
+      id,
+      body: text,
+      createdAt: now,
+      by: 'you',
+      alias: m.me.name ?? m.me.alias,
+    },
     201,
   );
 });
