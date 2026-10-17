@@ -40,8 +40,47 @@ const NEEDS = [
   ['requiresSpaces', 'boundsSpaces', 'space'],
 ];
 
-export const availability = (task, selections, unwilling = []) => {
+// Parts of a task the person doing it can require to be filled in before it is
+// assigned to them. Guardrails and kinks are on the task itself; a due time is
+// chosen when assigning.
+export const REQUIRED_FIELDS = ['guardrails', 'kinks', 'due'];
+
+const GUARDRAIL_FIELDS = [
+  'requiresBodyPart',
+  'requiresBoundsBody',
+  'requiresClothing',
+  'requiresEquipment',
+  'requiresSpaces',
+];
+const KINK_FIELDS = ['kinksReceiving', 'kinksGiving', 'kinksGeneral'];
+
+const filled = (task, fields) => fields.some((f) => (task[f] ?? []).length > 0);
+
+/** Which of the required parts are missing, as ['guardrails', 'kinks', 'due'] */
+export const missingFields = (task, required = [], { hasDue = false } = {}) =>
+  required.filter(
+    (field) =>
+      (field === 'guardrails' && !filled(task, GUARDRAIL_FIELDS)) ||
+      (field === 'kinks' && !filled(task, KINK_FIELDS)) ||
+      (field === 'due' && !hasDue),
+  );
+
+export const availability = (
+  task,
+  selections,
+  unwilling = [],
+  required = [],
+) => {
   const reasons = [];
+
+  // parts of the task they require to be filled in
+  // (a due time is chosen when assigning, so it is checked there)
+  for (const field of missingFields(
+    task,
+    required.filter((f) => f !== 'due'),
+  )) {
+    reasons.push({ code: 'missing-field', field });
+  }
 
   // the kind of task is one they are not up for
   if (unwilling.includes(task.proof ?? 'attestation')) {

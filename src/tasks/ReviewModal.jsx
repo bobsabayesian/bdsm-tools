@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, Input, Modal, Space, Typography } from 'antd';
 import api, { errorMessage } from '../services/tasks-api';
+import CommentsThread from './CommentsThread';
 import { ResponseSummary } from './proofs';
 
 /** The person who set a task looks over what was submitted: approve it, or send it back */
@@ -69,6 +70,14 @@ export default function ReviewModal({
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
+        <div>
+          <Typography.Text type='secondary'>Comments</Typography.Text>
+          <CommentsThread
+            dynamicId={dynamicId}
+            target={`assignment:${assignment.id}`}
+            canWrite
+          />
+        </div>
       </Space>
     </Modal>
   );

@@ -8,6 +8,7 @@ import {
   availability,
   checkResponse,
   parseQuiz,
+  REQUIRED_FIELDS,
   SUPPORTED_PROOFS,
 } from '../tasks';
 import {
@@ -22,10 +23,18 @@ import {
   daysFor,
   effectiveDays,
   fullPolicy,
+  parseFields,
   parseKinds,
   parsePolicy,
   visibility,
 } from '../retention';
+import {
+  endOfLocalDay,
+  finished,
+  localDate,
+  occursOn,
+  readRepeat,
+} from '../schedule';
 import { getDoc, listDocs } from '../docs';
 import { resumeDuePauses } from './dynamics';
 
@@ -129,13 +138,14 @@ const forbid = (c, message) => c.json({ error: message }, 403);
 const preferencesOf = async (db, userId) => {
   const row = await db
     .prepare(
-      'SELECT data_retention, unwilling_task_types FROM users WHERE id = ?',
+      'SELECT data_retention, unwilling_task_types, required_task_fields FROM users WHERE id = ?',
     )
     .bind(userId)
     .first();
   return {
     policy: parsePolicy(row?.data_retention),
     unwilling: parseKinds(row?.unwilling_task_types),
+    required: parseFields(row?.required_task_fields, REQUIRED_FIELDS),
   };
 };
 
@@ -253,6 +263,7 @@ dynamicWork.get('/:id/tasks', async (c) => {
   const { m, res } = await guard(c);
   if (res) return res;
   const db = c.env.DB;
+  await makeDueOccurrences(db, m);
   const [{ results }, counts] = await Promise.all([
     db
       .prepare(
@@ -269,9 +280,10 @@ dynamicWork.get('/:id/tasks', async (c) => {
   });
 });
 
-// Days of content retention: the default for tasks you set (yours) and the most
-// your partner allows (theirs), for each kind of proof
-dynamicWork.get('/:id/retention', async (c) => {
+// What you need to know to assign: days of content retention (your default
+// for tasks you set, and the most your partner allows, for each kind of
+// proof) and the parts of a task your partner requires to be filled in
+dynamicWork.get('/:id/assign-options', async (c) => {
   const { m, res } = await guard(c);
   if (res) return res;
   if (!m.canAssign)
@@ -283,6 +295,8 @@ dynamicWork.get('/:id/retention', async (c) => {
   return c.json({
     mine: fullPolicy(mine.policy),
     theirs: fullPolicy(theirs.policy),
+    // parts of a task they require to be filled in before it is assigned
+    requiredFields: theirs.required,
   });
 });
 
@@ -296,7 +310,7 @@ dynamicWork.get('/:id/library', async (c) => {
   if (notReady) return notReady;
   const db = c.env.DB;
 
-  const [tasks, selections, { unwilling }] = await Promise.all([
+  const [tasks, selections, { unwilling, required }] = await Promise.all([
     listDocs(db, TASKS, { limit: 500 }),
     selectionsOf(db, m.assignee.user_id),
     preferencesOf(db, m.assignee.user_id),
@@ -307,7 +321,7 @@ dynamicWork.get('/:id/library', async (c) => {
     tasks
       .filter((task) => task.task)
       .map((task) => {
-        const a = availability(task, selections, unwilling);
+        const a = availability(task, selections, unwilling, required);
         return {
           id: task._id,
           ...Object.fromEntries(
@@ -334,6 +348,124 @@ const parseDue = (dueAt) => {
     return { error: 'The due date must be in the future (within three years)' };
   }
   return { due: when.toISOString() };
+};
+
+const insertAssignment = (db, a) =>
+  db
+    .prepare(
+      `INSERT INTO assignments (id, dynamic_id, assigned_by, assigned_to, template_id, task, status,
+         requires_review, due_at, attested_soft_limits, created_at, retention_days,
+         consequence_for, queued, schedule_id)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      a.id,
+      a.dynamicId,
+      a.assignedBy,
+      a.assignedTo,
+      a.templateId ?? null,
+      JSON.stringify(a.task),
+      a.requiresReview ? 1 : 0,
+      a.due ?? null,
+      JSON.stringify(a.attested ?? []),
+      a.createdAt,
+      a.retentionDays,
+      a.consequenceFor ?? null,
+      a.queued ? 1 : 0,
+      a.scheduleId ?? null,
+    );
+
+/** How long what they submit is kept: the shorter of the setter's wish and the doer's maximum */
+const retentionFor = async (db, setterId, doerPolicy, task, requested) => {
+  const setter = await preferencesOf(db, setterId);
+  const proof = task.proof ?? 'attestation';
+  return effectiveDays({
+    requested,
+    setterDefault: daysFor(setter.policy, proof),
+    doerMax: daysFor(doerPolicy, proof),
+  });
+};
+
+/**
+ * Repeating tasks make their day's task the first time anyone opens the
+ * dynamic's tasks that day. Days nobody looked at are not made up afterwards,
+ * and a day is skipped (with a note) if the task has since become something the
+ * person cannot be given - a hard limit, a task type they are no longer up
+ * for - so a schedule never gets around what they have said.
+ */
+const makeDueOccurrences = async (db, m) => {
+  if (m.status !== 'active') return;
+  const { results } = await db
+    .prepare(
+      "SELECT * FROM task_schedules WHERE dynamic_id = ? AND status = 'active'",
+    )
+    .bind(m.id)
+    .all();
+  const now = Date.now();
+  for (const s of results) {
+    const today = localDate(now, s.tz_offset);
+    if (finished(s, today)) {
+      await db
+        .prepare("UPDATE task_schedules SET status = 'stopped' WHERE id = ?")
+        .bind(s.id)
+        .run();
+      continue;
+    }
+    if (s.last_date === today || !occursOn(s, today)) continue;
+    // claim the day first, so two people opening the page cannot both make it
+    const claimed = await db
+      .prepare(
+        'UPDATE task_schedules SET last_date = ?1, note = NULL WHERE id = ?2 AND (last_date IS NULL OR last_date <> ?1)',
+      )
+      .bind(today, s.id)
+      .run();
+    if (claimed.meta.changes !== 1) continue;
+
+    const task = JSON.parse(s.task);
+    const doer = await preferencesOf(db, s.assigned_to);
+    const selections = await selectionsOf(db, s.assigned_to);
+    const options = availability(
+      task,
+      selections,
+      doer.unwilling,
+      doer.required,
+    );
+    const verdict = assessAssignment(
+      task,
+      selections,
+      JSON.parse(s.attested_soft_limits),
+    );
+    const fine =
+      options.reasons.length === 0 &&
+      (verdict.allowed ||
+        (m.kind === 'solo' && verdict.reason === 'attestation-required'));
+    if (!fine) {
+      await db
+        .prepare('UPDATE task_schedules SET note = ? WHERE id = ?')
+        .bind(`Skipped ${today}: it can no longer be given as it stands`, s.id)
+        .run();
+      continue;
+    }
+    await insertAssignment(db, {
+      id: crypto.randomUUID(),
+      dynamicId: m.id,
+      assignedBy: s.created_by,
+      assignedTo: s.assigned_to,
+      task,
+      requiresReview: !!s.requires_review,
+      due: endOfLocalDay(today, s.tz_offset),
+      attested: JSON.parse(s.attested_soft_limits),
+      createdAt: new Date(now).toISOString(),
+      retentionDays: await retentionFor(
+        db,
+        s.created_by,
+        doer.policy,
+        task,
+        s.retention_days_requested,
+      ),
+      scheduleId: s.id,
+    }).run();
+  }
 };
 
 dynamicWork.post('/:id/tasks', async (c) => {
@@ -373,7 +505,7 @@ dynamicWork.post('/:id/tasks', async (c) => {
       )
     : [];
   const doer = await preferencesOf(db, m.assignee.user_id);
-  const options = availability(task, selections, doer.unwilling);
+  const options = availability(task, selections, doer.unwilling, doer.required);
   if (options.reasons.length > 0) {
     return c.json(
       {
@@ -384,6 +516,32 @@ dynamicWork.post('/:id/tasks', async (c) => {
       409,
     );
   }
+  // Some people require a due time before a task can be given to them
+  const repeatInput = input.repeat;
+  const today = localDate(
+    Date.now(),
+    Number.isInteger(repeatInput?.tzOffset) ? repeatInput.tzOffset : 0,
+  );
+  let repeat = null;
+  if (repeatInput) {
+    if (input.consequenceFor)
+      return c.json({ error: 'A consequence cannot repeat' }, 400);
+    const read = readRepeat(repeatInput, today);
+    if (read.error) return c.json({ error: read.error }, 400);
+    repeat = read.repeat;
+  }
+  const dueAt = repeat ? endOfLocalDay(today, repeat.tzOffset) : due;
+  if (doer.required.includes('due') && !dueAt) {
+    return c.json(
+      {
+        error: 'A due time is required for this person',
+        code: 'unavailable',
+        reasons: [{ code: 'missing-field', field: 'due' }],
+      },
+      409,
+    );
+  }
+
   const verdict = assessAssignment(task, selections, attested);
   if (verdict.reason === 'hard-limit') {
     return c.json(
@@ -420,46 +578,115 @@ dynamicWork.post('/:id/tasks', async (c) => {
     }
     consequenceFor = original.id;
   }
-  const queued = consequenceFor && input.queued !== false ? 1 : 0;
+  const queued = consequenceFor && input.queued !== false;
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
-  // How long what they submit is kept: the shorter of what the person setting
-  // it wants (their own default, or what they asked for here) and the most the
-  // person doing it allows. Kept with the task from now on.
-  const setter = await preferencesOf(db, m.me.user_id);
-  const proof = task.proof ?? 'attestation';
-  const retentionDays = effectiveDays({
-    requested: input.retentionDays,
-    setterDefault: daysFor(setter.policy, proof),
-    doerMax: daysFor(doer.policy, proof),
-  });
-  await db
-    .prepare(
-      `INSERT INTO assignments (id, dynamic_id, assigned_by, assigned_to, template_id, task, status,
-         requires_review, due_at, attested_soft_limits, created_at, retention_days,
-         consequence_for, queued)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      id,
-      m.id,
-      m.me.user_id,
-      m.assignee.user_id,
-      templateId,
-      JSON.stringify(task),
-      m.kind === 'pair' && input.requiresReview === true ? 1 : 0,
-      due,
-      JSON.stringify(m.kind === 'solo' ? [] : verdict.attested),
-      now,
-      retentionDays,
-      consequenceFor,
-      queued,
-    )
-    .run();
+  const attestedLimits = m.kind === 'solo' ? [] : verdict.attested;
+  const review = m.kind === 'pair' && input.requiresReview === true;
+  const statements = [];
+  let scheduleId = null;
+  // a repeat that starts on a later day makes nothing yet
+  const startsLater = !!repeat && repeat.startDate > today;
+  if (repeat) {
+    scheduleId = crypto.randomUUID();
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO task_schedules (id, dynamic_id, created_by, assigned_to, task,
+             attested_soft_limits, requires_review, retention_days_requested, frequency, weekday,
+             start_date, end_date, tz_offset, due_end_of_day, last_date, status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
+        )
+        .bind(
+          scheduleId,
+          m.id,
+          m.me.user_id,
+          m.assignee.user_id,
+          JSON.stringify(task),
+          JSON.stringify(attestedLimits),
+          review ? 1 : 0,
+          Number.isInteger(input.retentionDays) ? input.retentionDays : null,
+          repeat.frequency,
+          repeat.weekday,
+          repeat.startDate,
+          repeat.endDate,
+          repeat.tzOffset,
+          1,
+          startsLater ? null : today,
+          now,
+        ),
+    );
+  }
+  if (!startsLater) {
+    statements.push(
+      insertAssignment(db, {
+        id,
+        dynamicId: m.id,
+        assignedBy: m.me.user_id,
+        assignedTo: m.assignee.user_id,
+        templateId,
+        task,
+        requiresReview: review,
+        due: dueAt,
+        attested: attestedLimits,
+        createdAt: now,
+        retentionDays: await retentionFor(
+          db,
+          m.me.user_id,
+          doer.policy,
+          task,
+          input.retentionDays,
+        ),
+        consequenceFor,
+        queued,
+        scheduleId,
+      }),
+    );
+  }
+  await db.batch(statements);
 
+  if (startsLater) {
+    return c.json({ scheduled: true, startsOn: repeat.startDate }, 201);
+  }
   const row = await readAssignment(c, m, id);
   return c.json(presentAssignment(row, m, new Map()), 201);
+});
+
+// The repeating tasks of a dynamic, visible to both people
+dynamicWork.get('/:id/schedules', async (c) => {
+  const { m, res } = await guard(c);
+  if (res) return res;
+  const { results } = await c.env.DB.prepare(
+    "SELECT * FROM task_schedules WHERE dynamic_id = ? AND status = 'active' ORDER BY created_at",
+  )
+    .bind(m.id)
+    .all();
+  return c.json(
+    results.map((s) => ({
+      id: s.id,
+      task: JSON.parse(s.task),
+      frequency: s.frequency,
+      weekday: s.weekday,
+      endDate: s.end_date,
+      dueEndOfDay: !!s.due_end_of_day,
+      note: s.note,
+    })),
+  );
+});
+
+dynamicWork.post('/:id/schedules/:sid/stop', async (c) => {
+  const { m, res } = await guard(c, { write: true });
+  if (res) return res;
+  if (!m.canAssign)
+    return forbid(c, 'Only the person who set this can do that');
+  const stopped = await c.env.DB.prepare(
+    "UPDATE task_schedules SET status = 'stopped' WHERE id = ? AND dynamic_id = ? AND status = 'active'",
+  )
+    .bind(c.req.param('sid'), m.id)
+    .run();
+  if (stopped.meta.changes !== 1) return c.json({ error: 'Not found' }, 404);
+  return c.body(null, 204);
 });
 
 // Starting a timer task: the server notes when, and checks the time was served

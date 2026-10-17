@@ -11,7 +11,10 @@ export const errorData = (e) => e?.response?.data ?? {};
 const list = (id) => call('get', `/${id}/tasks`);
 const library = (id) => call('get', `/${id}/library`);
 const taskFields = (id) => call('get', `/${id}/task-fields`);
-const retention = (id) => call('get', `/${id}/retention`);
+const assignOptions = (id) => call('get', `/${id}/assign-options`);
+const schedules = (id) => call('get', `/${id}/schedules`);
+const stopSchedule = (id, sid) =>
+  call('post', `/${id}/schedules/${sid}/stop`, {});
 const assign = (id, body) => call('post', `/${id}/tasks`, body);
 const start = (id, aid) => call('post', `/${id}/tasks/${aid}/start`, {});
 const submit = (id, aid, response) =>
@@ -45,7 +48,9 @@ const comment = (id, target, body) =>
 
 export default {
   startConsequence,
-  retention,
+  assignOptions,
+  schedules,
+  stopSchedule,
   mediaUrl,
   uploadMedia,
   list,

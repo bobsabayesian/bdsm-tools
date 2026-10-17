@@ -12,6 +12,7 @@ import {
   Typography,
 } from 'antd';
 import api, { errorData, errorMessage } from '../services/tasks-api';
+import CommentsThread from './CommentsThread';
 import { questionOf } from './proofs';
 
 /** Counts down from `seconds`, measured from when the server saw the timer start */
@@ -345,6 +346,14 @@ export default function CompleteTaskModal({
               />
             </div>
           ))}
+        <div>
+          <Typography.Text type='secondary'>Comments</Typography.Text>
+          <CommentsThread
+            dynamicId={dynamicId}
+            target={`assignment:${assignment.id}`}
+            canWrite
+          />
+        </div>
       </Space>
     </Modal>
   );

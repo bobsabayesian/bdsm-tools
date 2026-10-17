@@ -21,8 +21,9 @@ import {
 import DynamicPage from '../components/DynamicPage';
 import api, { errorMessage } from '../services/tasks-api';
 import CompleteTaskModal from './CompleteTaskModal';
-import { requirement } from './proofs';
+import useCatalog from '../hooks/useCatalog';
 import { Summary, windows } from './schedule';
+import { TaskCard } from './TaskList';
 
 // The calendar needs these dayjs plugins
 dayjs.extend(customParseFormat);
@@ -45,6 +46,7 @@ function Mine({ dynamicId, paused }) {
   const [data, setData] = React.useState(null);
   const [day, setDay] = React.useState(dayjs());
   const [doing, setDoing] = React.useState(null);
+  const { items: kinks } = useCatalog('kinks');
 
   const load = () =>
     api
@@ -71,6 +73,27 @@ function Mine({ dynamicId, paused }) {
   const onDay = (date) =>
     mine.filter((a) => a.dueAt && dayjs(a.dueAt).isSame(date, 'day'));
   const doIt = (a) => a.status === 'pending' && !paused && setDoing(a);
+  const act = (call, a) =>
+    call(dynamicId, a.id)
+      .then(load)
+      .catch((e) => message.error(errorMessage(e)));
+  // the same card as everywhere else, so every task has its comment thread
+  const card = (a) => (
+    <TaskCard
+      key={a.id}
+      a={a}
+      you={data.you}
+      paused={paused}
+      controllerAlias={data.you.partner ?? 'You'}
+      kinks={kinks}
+      dynamicId={dynamicId}
+      onDo={doIt}
+      onReview={() => {}}
+      onAct={act}
+      onNotDone={(x) => act(api.notDone, x)}
+      originalTitle={mine.find((x) => x.id === a.consequenceFor)?.task.task}
+    />
+  );
 
   return (
     <>
@@ -119,62 +142,18 @@ function Mine({ dynamicId, paused }) {
       <Typography.Title level={5} style={{ marginTop: 16 }}>
         {day.format('dddd D MMMM')}
       </Typography.Title>
-      <List
-        locale={{ emptyText: 'Nothing due this day' }}
-        dataSource={onDay(day)}
-        renderItem={(a) => (
-          <List.Item
-            actions={
-              a.status === 'pending' && !paused
-                ? [
-                    <Button key='do' type='primary' onClick={() => doIt(a)}>
-                      Do it
-                    </Button>,
-                  ]
-                : []
-            }
-          >
-            <List.Item.Meta
-              title={
-                <>
-                  {a.task.task}{' '}
-                  <Tag color={a.overdue ? 'red' : undefined}>
-                    {a.overdue ? 'Overdue' : a.status}
-                  </Tag>
-                </>
-              }
-              description={`${requirement(a.task)} Due ${dayjs(a.dueAt).format('h:mma')}`}
-            />
-          </List.Item>
-        )}
-      />
+      {onDay(day).length === 0 ? (
+        <Typography.Text type='secondary'>Nothing due this day</Typography.Text>
+      ) : (
+        onDay(day).map(card)
+      )}
 
       {w.undated.length > 0 && (
         <>
           <Typography.Title level={5} style={{ marginTop: 16 }}>
             No due date
           </Typography.Title>
-          <List
-            dataSource={w.undated}
-            renderItem={(a) => (
-              <List.Item
-                actions={
-                  paused
-                    ? []
-                    : [
-                        <Button key='do' onClick={() => doIt(a)}>
-                          Do it
-                        </Button>,
-                      ]
-                }
-              >
-                <List.Item.Meta
-                  title={a.task.task}
-                  description={requirement(a.task)}
-                />
-              </List.Item>
-            )}
-          />
+          {w.undated.map(card)}
         </>
       )}
 

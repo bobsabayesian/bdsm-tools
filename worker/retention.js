@@ -76,6 +76,22 @@ export const parseKinds = (text) => {
   }
 };
 
+/** A list of required task fields from a request, or null if invalid */
+export const readFields = (input, allowed) =>
+  Array.isArray(input) && input.every((k) => allowed.includes(k))
+    ? [...new Set(input)]
+    : null;
+
+/** Stored list of required task fields (bad data counts as none) */
+export const parseFields = (text, allowed) => {
+  try {
+    const value = JSON.parse(text ?? '[]');
+    return Array.isArray(value) ? value.filter((k) => allowed.includes(k)) : [];
+  } catch {
+    return [];
+  }
+};
+
 /**
  * Days a task's content is kept: what the person setting it asks for (or, if
  * they didn't say, their own default) - but never more than the person doing it

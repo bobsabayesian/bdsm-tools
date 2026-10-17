@@ -14,7 +14,7 @@ Things we have decided to build but have not yet. (What exists today is describe
 
 ## Still to come
 
-- Recurring tasks (due dates and a repeat rule).
+- Tasks that expire if not started within a set time (the "accept within 30 mins" idea) - needs an accept step first.
 - Role swaps - permanent and time-limited - with both people agreeing.
 - The **Items** and **Spaces** lists for "What's in bounds?" (Items is the old equipment list for now; Spaces is
   empty, so its section stays hidden).

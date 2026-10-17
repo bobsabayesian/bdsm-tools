@@ -67,9 +67,10 @@ const Username = () => (
   </Form.Item>
 );
 
-function AuthForms({ onAuthenticated }) {
+function AuthForms({ onAuthenticated, defaultTab }) {
   return (
     <Tabs
+      defaultActiveKey={defaultTab}
       items={[
         {
           key: 'login',
@@ -219,7 +220,7 @@ export default function Entry() {
   const [recoveryCode, setRecoveryCode] = React.useState(null);
   const [then, setThen] = React.useState(null); // where to go once the code is saved
   const [profile, setProfile] = React.useState(null);
-  const { hash } = useLocation();
+  const { hash, search } = useLocation();
 
   React.useEffect(() => {
     refresh();
@@ -258,6 +259,11 @@ export default function Entry() {
         </>
       ) : (
         <AuthForms
+          defaultTab={
+            new URLSearchParams(search).get('tab') === 'signup'
+              ? 'signup'
+              : 'login'
+          }
           onAuthenticated={(username, code, next) => {
             if (code) setRecoveryCode(code);
             setThen(next ?? null);

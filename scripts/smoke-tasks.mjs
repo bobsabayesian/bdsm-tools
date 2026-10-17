@@ -2,6 +2,7 @@
 //   ADMIN_TOKEN=... BASE=http://localhost:8787 node scripts/smoke-tasks.mjs
 // Use a fresh local database (it signs people up and creates kinks and tasks).
 import assert from 'node:assert/strict';
+import { execSync } from 'node:child_process';
 
 const BASE = process.env.BASE ?? 'http://localhost:8787';
 const ADMIN = process.env.ADMIN_TOKEN;
@@ -423,10 +424,10 @@ step(
 );
 // the sub allows 3 days for attestation (set above); the dom's default is 30
 const domMe = (await dom.call('GET', '/profile')).json.me;
-const limits = (await dom.call('GET', `${P}/retention`)).json;
+const limits = (await dom.call('GET', `${P}/assign-options`)).json;
 assert.equal(limits.theirs.attestation, 3);
 assert.equal(limits.mine.attestation, 30);
-assert.equal((await sub.call('GET', `${P}/retention`)).status, 403);
+assert.equal((await sub.call('GET', `${P}/assign-options`)).status, 403);
 const asked = (await assign(lib.Kneel, { retentionDays: 2 })).json;
 assert.equal(asked.retentionDays, 2, 'the dom asked for less');
 const tooMany = (await assign(lib.Kneel, { retentionDays: 90 })).json;
@@ -878,6 +879,160 @@ assert.equal(
     .status,
   'cancelled',
   'a queued one can be removed',
+);
+
+step('required task fields: the sub says what a task must include');
+const subMe = (await sub.call('GET', '/profile')).json.me;
+const saveRequired = (requiredTaskFields) =>
+  sub.call('PUT', '/profile/me', {
+    ...subMe,
+    dataRetention: { attestation: 3 },
+    requiredTaskFields,
+  });
+assert.equal((await saveRequired(['nonsense'])).status, 400);
+assert.equal((await saveRequired(['guardrails', 'kinks', 'due'])).status, 204);
+assert.deepEqual(
+  (await dom.call('GET', `${P}/assign-options`)).json.requiredFields,
+  ['guardrails', 'kinks', 'due'],
+);
+assert.deepEqual(
+  (await dom.call('GET', `${P}/profile`)).json.me.requiredTaskFields,
+  ['guardrails', 'kinks', 'due'],
+);
+const bare = await dom.call('POST', `${P}/tasks`, {
+  task: { task: 'Stand by the door', proof: 'attestation' },
+});
+assert.equal(bare.status, 409);
+assert.deepEqual(bare.json.reasons, [
+  { code: 'missing-field', field: 'guardrails' },
+  { code: 'missing-field', field: 'kinks' },
+]);
+const tomorrow = new Date(Date.now() + 864e5).toISOString();
+const themed = {
+  task: 'Stand by the door',
+  proof: 'attestation',
+  requiresBodyPart: [],
+  kinksGeneral: ['exhibitionism-voyeurism'],
+};
+assert.equal(
+  (
+    await dom.call('POST', `${P}/tasks`, {
+      task: { ...themed, requiresClothing: [] },
+      dueAt: tomorrow,
+    })
+  ).status,
+  409,
+  'still no guardrails',
+);
+const libReasons = (await dom.call('GET', `${P}/library`)).json.find(
+  (t) => t.task === 'Kneel',
+).availability.reasons;
+assert.ok(
+  libReasons.some((r) => r.code === 'missing-field'),
+  'the library shows why',
+);
+await saveRequired(['due']);
+const noDue = await dom.call('POST', `${P}/tasks`, { task: themed });
+assert.equal(noDue.status, 409);
+assert.deepEqual(noDue.json.reasons, [{ code: 'missing-field', field: 'due' }]);
+assert.equal(
+  (await dom.call('POST', `${P}/tasks`, { task: themed, dueAt: tomorrow }))
+    .status,
+  409,
+  'attestation still needed for the soft limit',
+);
+await saveRequired([]);
+
+step(
+  'repeating tasks make one a day, only when someone looks, and can be stopped',
+);
+const repeating = await dom.call('POST', `${P}/tasks`, {
+  task: { task: 'Morning check', proof: 'attestation' },
+  repeat: { frequency: 'daily', tzOffset: 0 },
+});
+assert.equal(repeating.status, 201);
+assert.ok(repeating.json.dueAt, 'always due the day it is assigned');
+assert.ok(
+  repeating.json.dueAt.endsWith('23:59:59.000Z'),
+  'at the end of that day',
+);
+const countMorning = async () =>
+  (await sub.call('GET', `${P}/tasks`)).json.assignments.filter(
+    (a) => a.task.task === 'Morning check',
+  ).length;
+assert.equal(await countMorning(), 1);
+assert.equal(
+  await countMorning(),
+  1,
+  'looking again the same day makes nothing more',
+);
+const schedules = (await sub.call('GET', `${P}/schedules`)).json;
+assert.equal(schedules.length, 1, 'both of them see it');
+assert.equal(schedules[0].frequency, 'daily');
+execSync(
+  `npx wrangler d1 execute bdsm-tools --local --command "UPDATE task_schedules SET last_date = '2000-01-01'"`,
+  { stdio: 'ignore' },
+);
+assert.equal(
+  await countMorning(),
+  2,
+  'a new day makes the next one - once, with no backlog',
+);
+assert.equal(await countMorning(), 2);
+assert.equal(
+  (await sub.call('POST', `${P}/schedules/${schedules[0].id}/stop`, {})).status,
+  403,
+);
+assert.equal(
+  (await dom.call('POST', `${P}/schedules/${schedules[0].id}/stop`, {})).status,
+  204,
+);
+execSync(
+  `npx wrangler d1 execute bdsm-tools --local --command "UPDATE task_schedules SET last_date = '2000-01-01'"`,
+  { stdio: 'ignore' },
+);
+assert.equal(await countMorning(), 2, 'stopped: nothing more');
+assert.equal((await sub.call('GET', `${P}/schedules`)).json.length, 0);
+const startDay = new Date(Date.now() + 2 * 864e5).toISOString().slice(0, 10);
+const later = await dom.call('POST', `${P}/tasks`, {
+  task: { task: 'Evening check', proof: 'attestation' },
+  repeat: { frequency: 'daily', tzOffset: 0, startDate: startDay },
+});
+assert.equal(later.status, 201);
+assert.equal(later.json.scheduled, true);
+assert.equal(later.json.startsOn, startDay);
+const countEvening = async () =>
+  (await sub.call('GET', `${P}/tasks`)).json.assignments.filter(
+    (a) => a.task.task === 'Evening check',
+  ).length;
+assert.equal(await countEvening(), 0, 'nothing is made before its start day');
+assert.equal((await sub.call('GET', `${P}/schedules`)).json.length, 1);
+execSync(
+  `npx wrangler d1 execute bdsm-tools --local --command "UPDATE task_schedules SET start_date = '2000-01-01' WHERE status = 'active'"`,
+  { stdio: 'ignore' },
+);
+assert.equal(await countEvening(), 1, 'on the start day the first one is made');
+assert.equal(await countEvening(), 1);
+const evening = (await sub.call('GET', `${P}/schedules`)).json[0];
+await dom.call('POST', `${P}/schedules/${evening.id}/stop`, {});
+assert.equal(
+  (
+    await dom.call('POST', `${P}/tasks`, {
+      task: { task: 'y', proof: 'attestation' },
+      repeat: { frequency: 'daily', tzOffset: 0, startDate: '2001-01-01' },
+    })
+  ).status,
+  400,
+  'cannot start in the past',
+);
+assert.equal(
+  (
+    await dom.call('POST', `${P}/tasks`, {
+      task: { task: 'x', proof: 'attestation' },
+      repeat: { frequency: 'hourly', tzOffset: 0 },
+    })
+  ).status,
+  400,
 );
 
 step(

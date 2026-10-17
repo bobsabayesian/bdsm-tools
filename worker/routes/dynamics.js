@@ -382,7 +382,7 @@ dynamics.get('/:id/profile', async (c) => {
 
   const partner = await db
     .prepare(
-      `SELECT u.id, u.profile_shared_at, u.profile_steps, u.rule_change_min_days, u.data_retention, u.unwilling_task_types
+      `SELECT u.id, u.profile_shared_at, u.profile_steps, u.rule_change_min_days, u.data_retention, u.unwilling_task_types, u.required_task_fields
        FROM dynamic_members m JOIN users u ON u.id = m.user_id
        WHERE m.dynamic_id = ? AND m.user_id != ? AND u.deleted_at IS NULL`,
     )
@@ -414,6 +414,7 @@ dynamics.get('/:id/profile', async (c) => {
       undefined,
       partner.data_retention,
       partner.unwilling_task_types,
+      partner.required_task_fields,
     ),
     selections: {
       bodyParts: results

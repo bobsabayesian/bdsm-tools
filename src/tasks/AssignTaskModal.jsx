@@ -10,6 +10,7 @@ import {
   List,
   Modal,
   Radio,
+  Select,
   Space,
   Spin,
   Tabs,
@@ -17,7 +18,7 @@ import {
   Typography,
 } from 'antd';
 import useCatalog from '../hooks/useCatalog';
-import { kinkWithSide } from '../account/kinkText';
+import { kinkWithSide, sidesOf } from '../account/kinkText';
 import { fieldDefaults, renderFields } from '../components/FieldsForm';
 import api, { errorData, errorMessage } from '../services/tasks-api';
 import { SoftLimitDialog } from './Attest';
@@ -25,6 +26,30 @@ import { PROOF_LABEL, requirement } from './proofs';
 
 const asOptions = (items) =>
   items.map((i) => ({ value: i.value, label: i.label }));
+
+const FIELD_NAME = {
+  guardrails: 'guardrail tags',
+  kinks: 'kinks',
+  due: 'a due time',
+};
+
+const FREQUENCY = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekdays', label: 'Weekdays' },
+  { value: 'weekly', label: 'Weekly (same day)' },
+];
+
+// Fields that have their own sections below, so they are left out of the first
+const SECTION_FIELDS = [
+  'requiresBodyPart',
+  'requiresBoundsBody',
+  'requiresClothing',
+  'requiresEquipment',
+  'requiresSpaces',
+  'kinksReceiving',
+  'kinksGiving',
+  'kinksGeneral',
+];
 
 /** The end of a day, or a given time, in the assigner's own timezone, as an instant */
 const dueInstant = (mode, date, time) => {
@@ -68,9 +93,16 @@ export default function AssignTaskModal({
   const [dueDate, setDueDate] = React.useState('');
   const [dueTime, setDueTime] = React.useState('');
   const [review, setReview] = React.useState(true);
-  const [limits, setLimits] = React.useState(null); // { mine, theirs } days of retention
+  const [limits, setLimits] = React.useState(null); // { mine, theirs, requiredFields }
+  const [repeat, setRepeat] = React.useState(false);
+  const [frequency, setFrequency] = React.useState('daily');
+  const [startDate, setStartDate] = React.useState('');
+  const [endMode, setEndMode] = React.useState('none');
+  const [endDate, setEndDate] = React.useState('');
   const [keepDays, setKeepDays] = React.useState(null); // null: the default
   const ownProof = Form.useWatch('proof', form);
+  const guardrails = Form.useWatch('guardrails', form);
+  const kinkTags = Form.useWatch('kinkTags', form);
   const [error, setError] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
   const [attest, setAttest] = React.useState(null); // soft limits awaiting Yes / Cancel
@@ -84,8 +116,14 @@ export default function AssignTaskModal({
     setLibrary(null);
     setKeepDays(null);
     setReview(true);
+    setRepeat(false);
+    setFrequency('daily');
+    setStartDate('');
+    setEndMode('none');
+    setEndDate('');
+    setDueMode('none');
     api
-      .retention(dynamicId)
+      .assignOptions(dynamicId)
       .then(setLimits)
       .catch(() => setLimits(null));
     api
@@ -118,6 +156,10 @@ export default function AssignTaskModal({
       if (reason.code === 'proof')
         parts.push(
           'needs photo, video or audio proof, which is not available yet',
+        );
+      if (reason.code === 'missing-field')
+        parts.push(
+          `${partner} requires a task to include ${FIELD_NAME[reason.field]}`,
         );
       if (reason.code === 'task-type')
         parts.push(
@@ -162,11 +204,19 @@ export default function AssignTaskModal({
     try {
       const task =
         tab === 'own'
-          ? await form.validateFields().then(() => form.getFieldsValue())
+          ? await form.validateFields().then(() => taskFromForm())
           : undefined;
-      await api.assign(dynamicId, {
+      const made = await api.assign(dynamicId, {
         ...(tab === 'own' ? { task } : { templateId: selected }),
-        dueAt: dueInstant(dueMode, dueDate, dueTime),
+        dueAt: repeat ? undefined : dueInstant(dueMode, dueDate, dueTime),
+        repeat: repeat
+          ? {
+              frequency,
+              startDate: startDate || undefined,
+              endDate: endMode === 'date' ? endDate : undefined,
+              tzOffset: new Date().getTimezoneOffset(),
+            }
+          : undefined,
         retentionDays: keepDays ?? undefined,
         requiresReview: kind === 'pair' ? review : false,
         consequenceFor: consequenceFor?.id,
@@ -174,7 +224,11 @@ export default function AssignTaskModal({
       });
       setAttest(null);
       message.success(
-        consequenceFor ? 'Added to the consequences queue' : 'Task assigned',
+        made?.scheduled
+          ? `Scheduled to start on ${made.startsOn}`
+          : consequenceFor
+            ? 'Added to the consequences queue'
+            : 'Task assigned',
       );
       onAssigned();
       onClose();
@@ -200,6 +254,71 @@ export default function AssignTaskModal({
     }
   };
 
+  // The sections that make up a task: one field for guardrails, one for kinks
+  const guardrailOptions = [
+    ['bodyParts', 'Body parts (My Body)', bodyParts],
+    ['boundsBody', 'Anatomy', boundsBody],
+    ['boundsClothing', 'Clothing & presentation', boundsClothing],
+    ['equipment', 'Gear & items', equipment],
+    ['boundsSpaces', 'Spaces', boundsSpaces],
+  ]
+    .filter(([, , items]) => items.length > 0)
+    .map(([catalog, heading, items]) => ({
+      label: heading,
+      options: items.map((i) => ({
+        value: `${catalog}/${i.value}`,
+        label: i.label,
+      })),
+    }));
+  const taskFromForm = () => {
+    const {
+      guardrails: tags = [],
+      kinkTags: picked = [],
+      ...rest
+    } = form.getFieldsValue();
+    const task = { ...rest };
+    const GUARDRAIL_FIELD = {
+      bodyParts: 'requiresBodyPart',
+      boundsBody: 'requiresBoundsBody',
+      boundsClothing: 'requiresClothing',
+      equipment: 'requiresEquipment',
+      boundsSpaces: 'requiresSpaces',
+    };
+    for (const tag of tags) {
+      const [catalog, ...key] = tag.split('/');
+      const field = GUARDRAIL_FIELD[catalog];
+      task[field] = [...(task[field] ?? []), key.join('/')];
+    }
+    // The direction follows the person doing the task: a kink with a single
+    // side goes on that side; one with two is something done to them
+    for (const key of picked) {
+      const sides = sidesOf(kinks.find((k) => k.value === key));
+      const field =
+        sides[0] === 'any'
+          ? 'kinksGeneral'
+          : sides.length === 1 && sides[0] === 'give'
+            ? 'kinksGiving'
+            : 'kinksReceiving';
+      task[field] = [...(task[field] ?? []), key];
+    }
+    return task;
+  };
+
+  const required = limits?.requiredFields ?? [];
+  // a repeating task is always due by the end of the day it is assigned
+  const hasDue = repeat || (dueMode !== 'none' && !!dueDate);
+  const missingParts =
+    tab === 'own'
+      ? required.filter(
+          (f) =>
+            (f === 'guardrails' && !(guardrails ?? []).length) ||
+            (f === 'kinks' && !(kinkTags ?? []).length) ||
+            (f === 'due' && !hasDue),
+        )
+      : required.includes('due') && !hasDue
+        ? ['due']
+        : [];
+  const locked = missingParts.length > 0;
   const canAssign = tab === 'own' || !!selected;
   const chosenProof =
     tab === 'own'
@@ -242,10 +361,10 @@ export default function AssignTaskModal({
             key='go'
             type='primary'
             loading={saving}
-            disabled={!canAssign || !!blocked}
+            disabled={!canAssign || !!blocked || locked}
             onClick={() => send([])}
           >
-            Assign
+            {locked ? 'Assign Task (Locked)' : 'Assign Task'}
           </Button>,
         ]}
       >
@@ -352,7 +471,45 @@ export default function AssignTaskModal({
                     <Spin />
                   ) : (
                     <Form form={form} layout='vertical' preserve={false}>
-                      {renderFields(fields, refOptions)}
+                      <Typography.Title level={5} style={{ marginTop: 0 }}>
+                        1. Core task definition
+                      </Typography.Title>
+                      {renderFields(
+                        fields.filter((f) => !SECTION_FIELDS.includes(f.name)),
+                        refOptions,
+                      )}
+                      <Typography.Title level={5}>
+                        2. Required in-bounds guardrails
+                      </Typography.Title>
+                      <Form.Item
+                        name='guardrails'
+                        label='Guardrail tags'
+                        extra={`Anatomy, gear, clothing and spaces this task needs. If ${partner ?? 'they'} haven\u2019t put one in bounds, the task can\u2019t be assigned.`}
+                      >
+                        <Select
+                          mode='multiple'
+                          showSearch
+                          optionFilterProp='label'
+                          placeholder='Search to add tags'
+                          options={guardrailOptions}
+                        />
+                      </Form.Item>
+                      <Typography.Title level={5}>
+                        3. Associated kinks &amp; themes
+                      </Typography.Title>
+                      <Form.Item
+                        name='kinkTags'
+                        label='Active kinks & atmosphere'
+                        extra='The direction follows the person doing the task. A kink with two sides is treated as something done to them.'
+                      >
+                        <Select
+                          mode='multiple'
+                          showSearch
+                          optionFilterProp='label'
+                          placeholder='Search to add kinks'
+                          options={asOptions(kinks)}
+                        />
+                      </Form.Item>
                     </Form>
                   ),
                 },
@@ -360,34 +517,107 @@ export default function AssignTaskModal({
             />
 
             <div>
-              <Typography.Text strong>Due</Typography.Text>
-              <div>
-                <Radio.Group
-                  value={dueMode}
-                  onChange={(e) => setDueMode(e.target.value)}
-                >
-                  <Radio value='none'>No due date</Radio>
-                  <Radio value='day'>By the end of a day</Radio>
-                  <Radio value='time'>By a time</Radio>
-                </Radio.Group>
-              </div>
-              {dueMode !== 'none' && (
-                <Space style={{ marginTop: 8 }}>
+              <Typography.Title level={5} style={{ marginTop: 0 }}>
+                {tab === 'own' ? '4. ' : ''}Scheduling &amp; automation
+                (optional)
+              </Typography.Title>
+              <Checkbox
+                checked={repeat}
+                onChange={(e) => {
+                  setRepeat(e.target.checked);
+                  if (e.target.checked && dueMode === 'time') setDueMode('day');
+                }}
+              >
+                Make this a recurring task
+              </Checkbox>
+              {repeat && (
+                <Space wrap style={{ margin: '8px 0 0 24px' }}>
+                  <Typography.Text>Starts</Typography.Text>
                   <Input
                     type='date'
-                    aria-label='Due date'
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
+                    aria-label='Start date'
+                    value={startDate}
+                    min={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setStartDate(e.target.value)}
                   />
-                  {dueMode === 'time' && (
+                  <Select
+                    aria-label='Frequency'
+                    style={{ width: 180 }}
+                    value={frequency}
+                    onChange={setFrequency}
+                    options={FREQUENCY}
+                  />
+                  <Select
+                    aria-label='End'
+                    style={{ width: 160 }}
+                    value={endMode}
+                    onChange={setEndMode}
+                    options={[
+                      { value: 'none', label: 'No end date' },
+                      { value: 'date', label: 'Ends on a date' },
+                    ]}
+                  />
+                  {endMode === 'date' && (
                     <Input
-                      type='time'
-                      aria-label='Due time'
-                      value={dueTime}
-                      onChange={(e) => setDueTime(e.target.value)}
+                      type='date'
+                      aria-label='End date'
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
                     />
                   )}
                 </Space>
+              )}
+              {repeat && (
+                <div style={{ marginLeft: 24 }}>
+                  <Typography.Text type='secondary'>
+                    {startDate
+                      ? 'The first one is made on the start day'
+                      : 'The first one is made now'}
+                    , then one each matching day when anyone opens the tasks.
+                    Each is due by the end of the day it&rsquo;s assigned. Days
+                    nobody opened aren&rsquo;t made up afterwards, and you can
+                    stop it at any time.
+                  </Typography.Text>
+                </div>
+              )}
+              {!repeat && (
+                <>
+                  <div style={{ marginTop: 12 }}>
+                    <Typography.Text strong>Due window</Typography.Text>
+                  </div>
+                  <div>
+                    <Radio.Group
+                      value={dueMode}
+                      onChange={(e) => setDueMode(e.target.value)}
+                    >
+                      <Radio value='none'>No due date</Radio>
+                      <Radio value='day'>
+                        {repeat
+                          ? 'By the end of each day'
+                          : 'By the end of a day'}
+                      </Radio>
+                      {!repeat && <Radio value='time'>By a time</Radio>}
+                    </Radio.Group>
+                  </div>
+                  {dueMode !== 'none' && !repeat && (
+                    <Space style={{ marginTop: 8 }}>
+                      <Input
+                        type='date'
+                        aria-label='Due date'
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                      />
+                      {dueMode === 'time' && (
+                        <Input
+                          type='time'
+                          aria-label='Due time'
+                          value={dueTime}
+                          onChange={(e) => setDueTime(e.target.value)}
+                        />
+                      )}
+                    </Space>
+                  )}
+                </>
               )}
             </div>
 
@@ -415,6 +645,15 @@ export default function AssignTaskModal({
                     : `Your default is ${limits.mine[chosenProof]} days, and ${partner} allows at most ${maxKeep} for this kind of task - the shorter always applies.`}
                 </Typography.Text>
               </div>
+            )}
+
+            {locked && (
+              <Alert
+                type='warning'
+                showIcon
+                title={`Locked: ${partner ?? 'they'} requires ${missingParts.map((f) => FIELD_NAME[f]).join(', ')}`}
+                description={`${partner ?? 'They'} chose this in their profile, so a task can't be assigned without it.`}
+              />
             )}
 
             {kind === 'pair' && (

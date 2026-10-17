@@ -33,7 +33,7 @@ const STATUS = {
   cancelled: { color: 'default', label: 'Cancelled' },
 };
 
-function TaskCard({
+export function TaskCard({
   a,
   you,
   paused,
@@ -232,6 +232,7 @@ export default function TaskList({ dynamicId, paused, mode = 'all' }) {
   const [assigning, setAssigning] = React.useState(false);
   const [doing, setDoing] = React.useState(null);
   const [reviewing, setReviewing] = React.useState(null);
+  const [repeating, setRepeating] = React.useState([]);
   const [offer, setOffer] = React.useState(null); // a task just marked not done
   const [consequence, setConsequence] = React.useState(null);
 
@@ -239,6 +240,8 @@ export default function TaskList({ dynamicId, paused, mode = 'all' }) {
     api
       .list(dynamicId)
       .then(setData)
+      .then(() => api.schedules(dynamicId))
+      .then(setRepeating)
       .catch((e) => message.error(errorMessage(e)));
   React.useEffect(() => {
     setData(null);
@@ -345,6 +348,53 @@ export default function TaskList({ dynamicId, paused, mode = 'all' }) {
         />
       ) : (
         open.map(card)
+      )}
+
+      {mode === 'all' && repeating.length > 0 && (
+        <>
+          <Typography.Title level={5} style={{ marginTop: 24 }}>
+            Repeating tasks ({repeating.length})
+          </Typography.Title>
+          {repeating.map((r) => (
+            <Card key={r.id} size='small' style={{ marginBottom: 8 }}>
+              <Space
+                wrap
+                style={{ width: '100%', justifyContent: 'space-between' }}
+              >
+                <span>
+                  <b>{r.task.task}</b>{' '}
+                  <Tag>
+                    {
+                      {
+                        daily: 'Daily',
+                        weekdays: 'Weekdays',
+                        weekly: 'Weekly',
+                      }[r.frequency]
+                    }
+                  </Tag>
+                  {r.endDate && <Tag>until {r.endDate}</Tag>}
+                  {r.note && (
+                    <Typography.Text type='secondary'>{r.note}</Typography.Text>
+                  )}
+                </span>
+                {you.canAssign && !paused && (
+                  <Popconfirm
+                    title='Stop repeating this?'
+                    description='Tasks already made stay as they are.'
+                    onConfirm={() =>
+                      api
+                        .stopSchedule(dynamicId, r.id)
+                        .then(load)
+                        .catch((e) => message.error(errorMessage(e)))
+                    }
+                  >
+                    <Button size='small'>Stop repeating</Button>
+                  </Popconfirm>
+                )}
+              </Space>
+            </Card>
+          ))}
+        </>
       )}
 
       {!reviewing_ && mode !== 'consequences' && queue.length > 0 && (

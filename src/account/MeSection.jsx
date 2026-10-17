@@ -10,7 +10,7 @@ import {
   Spin,
   Typography,
 } from 'antd';
-import { PROOF_LABELS } from './retention';
+import { PROOF_LABELS, TASK_FIELD_LABELS } from './retention';
 import SaveActions from './SaveActions';
 import { scrollToTop } from '../util';
 import useCatalog from '../hooks/useCatalog';
@@ -35,6 +35,7 @@ const normalise = (me) =>
     me.ruleChangeMinDays,
     me.dataRetention,
     [...me.unwillingTaskTypes].sort(),
+    [...me.requiredTaskFields].sort(),
   ]);
 
 /**
@@ -236,6 +237,36 @@ export default function MeSection({ onDirty }) {
                       unwillingTaskTypes: e.target.checked
                         ? me.unwillingTaskTypes.filter((k) => k !== kind)
                         : [...me.unwillingTaskTypes, kind],
+                    })
+                  }
+                >
+                  {label}
+                </Checkbox>
+              ))}
+            </Space>
+          </div>
+        )}
+
+        {showSub && (
+          <div>
+            <Typography.Text strong>What a task must include</Typography.Text>
+            <Typography.Paragraph type='secondary' style={{ margin: 0 }}>
+              Tick the parts you want filled in before a task can be assigned to
+              you. The person setting tasks sees the button locked until
+              they&rsquo;ve done it, so you always know what you&rsquo;re being
+              asked to do.
+            </Typography.Paragraph>
+            <Space orientation='vertical' size={0} style={{ marginTop: 4 }}>
+              {Object.entries(TASK_FIELD_LABELS).map(([field, label]) => (
+                <Checkbox
+                  key={field}
+                  checked={me.requiredTaskFields.includes(field)}
+                  onChange={(e) =>
+                    setMe({
+                      ...me,
+                      requiredTaskFields: e.target.checked
+                        ? [...me.requiredTaskFields, field]
+                        : me.requiredTaskFields.filter((f) => f !== field),
                     })
                   }
                 >
