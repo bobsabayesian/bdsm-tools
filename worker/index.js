@@ -4,6 +4,7 @@ import { admin } from './routes/admin';
 import { catalog } from './routes/catalog';
 import { dynamics } from './routes/dynamics';
 import { featureFlags } from './routes/feature-flags';
+import { profile } from './routes/profile';
 import { sceneNegotiation } from './routes/scene-negotiation';
 import { slaveTraining } from './routes/slave-training';
 
@@ -18,6 +19,7 @@ app.route('/api/admin', admin);
 app.route('/api/catalog', catalog);
 app.route('/api/account', account);
 app.route('/api/dynamics', dynamics);
+app.route('/api/profile', profile);
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404));
 

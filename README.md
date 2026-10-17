@@ -96,3 +96,12 @@ For local testing, `npm run seed:users` (with `npm run dev:api` running) creates
 `dom-test`, `sub-test` and `switch-test` (password `test-password-123`), with the first two
 already in a dynamic together. It refuses to run against anything but localhost. Use separate
 private/incognito windows to be logged in as two people at once.
+
+### Setup choices
+
+After signing up, people are asked which body parts they would like **included** in tasks. It is
+deliberately about what someone wants in play, not their anatomy or identity - nobody is asked
+about sex or gender, the quick-start presets only ever add to what is ticked, and skipping is fine.
+Choices are private to the person (`user_selections`) and are not shown to anyone in their dynamics.
+Body parts, their groups and the presets are all editable in the admin tool (`worker/catalogs.js`).
+When writing task text, please use neutral wording ("your", "they") rather than gendered pronouns.

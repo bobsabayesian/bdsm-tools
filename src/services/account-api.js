@@ -18,6 +18,11 @@ const changePassword = (currentPassword, newPassword) =>
   call('post', '/account/password', { currentPassword, newPassword });
 const deleteAccount = (password) => call('delete', '/account', { password });
 
+// Setup choices (body parts, later kinks)
+const getProfile = () => call('get', '/profile');
+const saveChoices = (step, keys) => call('put', `/profile/${step}`, { keys });
+const skipStep = (step) => call('post', `/profile/steps/${step}/skip`, {});
+
 // Dynamics
 const listDynamics = () => call('get', '/dynamics');
 const getDynamic = (id) => call('get', `/dynamics/${id}`);
@@ -41,6 +46,9 @@ export default {
   recover,
   changePassword,
   deleteAccount,
+  getProfile,
+  saveChoices,
+  skipStep,
   listDynamics,
   getDynamic,
   startSolo,

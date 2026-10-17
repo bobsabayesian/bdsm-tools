@@ -273,9 +273,10 @@ account.delete('/', requireUser, async (c) => {
         .bind(crypto.randomUUID(), id, user.id, now),
     ]),
     db.prepare('DELETE FROM auth_sessions WHERE user_id = ?').bind(user.id),
+    db.prepare('DELETE FROM user_selections WHERE user_id = ?').bind(user.id),
     db
       .prepare(
-        `UPDATE users SET username = ?, password_hash = '', recovery_hash = '', deleted_at = ? WHERE id = ?`,
+        `UPDATE users SET username = ?, password_hash = '', recovery_hash = '', profile_steps = '{}', deleted_at = ? WHERE id = ?`,
       )
       .bind(`deleted-${user.id}`, now, user.id),
   ]);

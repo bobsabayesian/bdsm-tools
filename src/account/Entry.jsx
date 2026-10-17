@@ -10,6 +10,7 @@ import {
   Tabs,
   Typography,
 } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import api, { errorMessage } from '../services/account-api';
 import useAccount from '../state/useAccount';
@@ -104,7 +105,7 @@ function AuthForms({ onAuthenticated }) {
                 api
                   .signup(username, password)
                   .then(({ recoveryCode }) =>
-                    onAuthenticated(username, recoveryCode),
+                    onAuthenticated(username, recoveryCode, '/account/setup'),
                   )
               }
             >
@@ -213,7 +214,9 @@ function RecoveryCodeModal({ code, onDone }) {
 
 export default function Entry() {
   const { user, loaded, refresh, setUser } = useAccount();
+  const navigate = useNavigate();
   const [recoveryCode, setRecoveryCode] = React.useState(null);
+  const [then, setThen] = React.useState(null); // where to go once the code is saved
 
   React.useEffect(() => {
     refresh();
@@ -231,8 +234,9 @@ export default function Entry() {
         </>
       ) : (
         <AuthForms
-          onAuthenticated={(username, code) => {
+          onAuthenticated={(username, code, next) => {
             if (code) setRecoveryCode(code);
+            setThen(next ?? null);
             setUser({ username });
           }}
         />
@@ -240,7 +244,10 @@ export default function Entry() {
       {recoveryCode && (
         <RecoveryCodeModal
           code={recoveryCode}
-          onDone={() => setRecoveryCode(null)}
+          onDone={() => {
+            setRecoveryCode(null);
+            if (then) navigate(then);
+          }}
         />
       )}
     </>

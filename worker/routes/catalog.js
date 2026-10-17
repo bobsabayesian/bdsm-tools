@@ -20,6 +20,20 @@ catalog.get('/:name', async (c) => {
   return c.json(
     items
       .filter((item) => item.active)
-      .map(({ key, label }) => ({ label, value: key })),
+      .map((item) => {
+        // `value` is the key; everything else the catalog defines comes along
+        // (label, group, parts...) minus bookkeeping
+        const fields = { ...item };
+        for (const bookkeeping of [
+          '_id',
+          'key',
+          'active',
+          'added',
+          'updated',
+        ]) {
+          delete fields[bookkeeping];
+        }
+        return { value: item.key, ...fields };
+      }),
   );
 });

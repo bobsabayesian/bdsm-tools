@@ -111,9 +111,35 @@ const catalogs = {
   ]),
   // `public` catalogs are readable by everyone (active items only) at
   // /api/catalog/:name - the site uses them to build its lists.
-  bodyParts: simpleCatalog('Body parts', 'catalog-body-parts', [], {
-    public: true,
-  }),
+  bodyParts: simpleCatalog(
+    'Body parts',
+    'catalog-body-parts',
+    [
+      {
+        name: 'group',
+        label: 'Group',
+        type: 'string',
+        help: 'Parts are listed under their group on the setup screen, e.g. "Genitals"',
+      },
+    ],
+    { public: true },
+  ),
+  // Quick-start bundles on the setup screen. They only add to what a person
+  // has ticked, so name them for the parts they contain, not for a kind of person.
+  bodyPartPresets: simpleCatalog(
+    'Body part presets',
+    'catalog-body-part-presets',
+    [
+      {
+        name: 'parts',
+        label: 'Parts',
+        type: 'ref',
+        catalog: 'bodyParts',
+        required: true,
+      },
+    ],
+    { public: true },
+  ),
   equipment: simpleCatalog('Equipment', 'catalog-equipment', [], {
     public: true,
   }),

@@ -232,6 +232,7 @@ export default function Dynamics() {
   const [dynamics, setDynamics] = React.useState(null);
   const [inviting, setInviting] = React.useState(false);
   const [joining, setJoining] = React.useState(false);
+  const [setupPending, setSetupPending] = React.useState(false);
 
   const load = () =>
     api
@@ -241,6 +242,10 @@ export default function Dynamics() {
 
   React.useEffect(() => {
     load();
+    api
+      .getProfile()
+      .then((profile) => setSetupPending(!!profile.nextStep))
+      .catch(() => {}); // the prompt is a nicety
   }, []);
 
   const open = (dynamic) => navigate(`/account/dynamics/${dynamic.id}`);
@@ -249,6 +254,24 @@ export default function Dynamics() {
 
   return (
     <>
+      {setupPending && (
+        <Alert
+          type='info'
+          showIcon
+          style={{ marginBottom: 16 }}
+          message='Finish setting up your profile'
+          description='Choose which body parts you would like included in tasks. It takes a minute and you can change it later.'
+          action={
+            <Button
+              size='small'
+              type='primary'
+              onClick={() => navigate('/account/setup')}
+            >
+              Set up
+            </Button>
+          }
+        />
+      )}
       <Space wrap style={{ marginBottom: 24 }}>
         <Button type='primary' onClick={() => setInviting(true)}>
           Invite someone

@@ -9,6 +9,7 @@ import {
   Space,
   Typography,
 } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../services/account-api';
 import useAccount from '../state/useAccount';
 
@@ -105,6 +106,7 @@ function DeleteAccount() {
 
 export default function AccountSettings() {
   const { user, setUser } = useAccount();
+  const navigate = useNavigate();
 
   return (
     <Collapse
@@ -118,6 +120,9 @@ export default function AccountSettings() {
             <Space direction='vertical' size='large'>
               <Button onClick={() => api.logout().finally(() => setUser(null))}>
                 Log out
+              </Button>
+              <Button onClick={() => navigate('/account/setup')}>
+                Change what is included in tasks
               </Button>
               <ChangePassword />
               <DeleteAccount />

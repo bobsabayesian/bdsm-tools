@@ -88,6 +88,94 @@ assert.equal(
   401,
 );
 
+step('setup: the public catalogs offer groups and additive presets');
+const publicParts = await (await fetch(`${BASE}/api/catalog/bodyParts`)).json();
+assert.ok(
+  publicParts.length >= 8 &&
+    publicParts.every((p) => p.value && p.label && p.group),
+);
+const presets = await (
+  await fetch(`${BASE}/api/catalog/bodyPartPresets`)
+).json();
+assert.ok(
+  presets.length >= 3 &&
+    presets.every((p) => Array.isArray(p.parts) && p.parts.length),
+);
+assert.ok(
+  presets
+    .flatMap((p) => p.parts)
+    .every((k) => publicParts.some((p) => p.value === k)),
+  'presets only contain real parts',
+);
+
+step('setup: body parts are chosen, validated and private');
+assert.equal((await new Person('x').call('GET', '/profile')).status, 401);
+let profile = (await b.call('GET', '/profile')).json;
+assert.deepEqual(profile.steps, [{ id: 'bodyParts', status: null }]);
+assert.equal(profile.nextStep, 'bodyParts');
+assert.equal(
+  (await b.call('PUT', '/profile/bodyParts', { keys: ['mouth', 'nope'] }))
+    .status,
+  400,
+  'unknown parts are refused',
+);
+assert.equal(
+  (
+    await b.call('PUT', '/profile/bodyParts', {
+      choices: [{ key: 'mouth', state: 'no' }],
+    })
+  ).status,
+  400,
+  'body parts have no "no" state',
+);
+assert.equal(
+  (await b.call('PUT', '/profile/kinks', { keys: [] })).status,
+  404,
+  'kinks are not a step yet',
+);
+assert.equal(
+  (
+    await b.call('PUT', '/profile/bodyParts', {
+      keys: ['mouth', 'pussy', 'mouth'],
+    })
+  ).status,
+  204,
+);
+profile = (await b.call('GET', '/profile')).json;
+assert.deepEqual(profile.selections.bodyParts.map((x) => x.key).sort(), [
+  'mouth',
+  'pussy',
+]);
+assert.equal(profile.steps[0].status, 'done');
+assert.equal(profile.nextStep, null);
+await b.call('PUT', '/profile/bodyParts', { keys: ['ass'] });
+assert.deepEqual(
+  (await b.call('GET', '/profile')).json.selections.bodyParts.map((x) => x.key),
+  ['ass'],
+  'saving replaces the earlier choice',
+);
+assert.equal(
+  (await b.call('PUT', '/profile/bodyParts', { keys: [] })).status,
+  204,
+  'choosing nothing is allowed',
+);
+
+step('setup: skipping is allowed and can be undone');
+assert.equal(
+  (await c.call('POST', '/profile/steps/bodyParts/skip', {})).status,
+  204,
+);
+profile = (await c.call('GET', '/profile')).json;
+assert.equal(profile.steps[0].status, 'skipped');
+assert.equal(profile.nextStep, null, 'a skipped step is not nagged about');
+await c.call('PUT', '/profile/bodyParts', { keys: ['throat'] });
+await c.call('POST', '/profile/steps/bodyParts/skip', {});
+assert.equal(
+  (await c.call('GET', '/profile')).json.steps[0].status,
+  'done',
+  'skipping never undoes a finished step',
+);
+
 step('Alice invites, Bob joins');
 const invite = await a.call('POST', '/dynamics/invite', {
   role: 'dom',
