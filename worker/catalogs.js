@@ -3,11 +3,17 @@
  * matter of adding an entry here - the API and the admin UI are both driven
  * by these definitions.
  *
- * Field types: string | text | number | boolean | select | strings | ref
+ * Field types: string | text | number | boolean | select | strings | ref | refOne
  *  - select:  `options: [{ label, value }]`
  *  - strings: free-form list of strings
  *  - ref:     list of `key`s from another catalog (`catalog`). Not enforced by
  *             the API as some references predate the catalogs.
+ *  - refOne:  a single `key` from another catalog (`catalog`)
+ *
+ * Other field settings:
+ *  - showWhen: `{ field, in: [...] }` - only shown (and stored) while another
+ *              field has one of these values
+ *  - inTable:  `false` keeps the field out of the admin table
  */
 
 const catalogField = {
@@ -47,15 +53,29 @@ const simpleCatalog = (title, collection, extraFields = [], options = {}) => ({
   ],
 });
 
+// How a task is proven or logged. Each needs its own screen and validation,
+// so this list lives in code rather than being admin-editable.
+const PROOF_TYPES = [
+  { label: 'Attestation (checkbox)', value: 'attestation' },
+  { label: 'Photo / video / audio', value: 'media' },
+  { label: 'Number (measurement)', value: 'numeric' },
+  { label: 'Journal / long text', value: 'text' },
+  { label: 'Repeated lines', value: 'lines' },
+  { label: 'Timer (hold)', value: 'timer' },
+  { label: 'Choice (or permission)', value: 'choice' },
+  { label: 'Quiz / memorisation', value: 'quiz' },
+  { label: 'Location check-in', value: 'location' },
+];
+
+// Settings that only apply to some proof types
+const forProof = (proofs, field) => ({
+  ...field,
+  showWhen: { field: 'proof', in: proofs },
+  inTable: false,
+});
+
 const catalogs = {
-  taskTypes: simpleCatalog('Task types', 'catalog-task-types', [
-    {
-      name: 'defaultTimeOptions',
-      label: 'Default time options',
-      type: 'strings',
-      help: 'e.g. "5 minutes", "1 hour"',
-    },
-  ]),
+  taskCategories: simpleCatalog('Task categories', 'catalog-task-categories'),
   genders: simpleCatalog('Genders', 'catalog-genders', [
     {
       name: 'pronouns',
@@ -132,6 +152,101 @@ const catalogs = {
     titleField: 'task',
     fields: [
       { name: 'task', label: 'Task', type: 'text', required: true },
+      {
+        name: 'category',
+        label: 'Category',
+        type: 'refOne',
+        catalog: 'taskCategories',
+      },
+      {
+        name: 'proof',
+        label: 'How it is proven',
+        type: 'select',
+        options: PROOF_TYPES,
+        default: 'attestation',
+      },
+      forProof(['numeric'], {
+        name: 'unit',
+        label: 'Unit',
+        type: 'string',
+        help: 'e.g. "ounces", "hours"',
+      }),
+      forProof(['numeric'], {
+        name: 'minValue',
+        label: 'Minimum',
+        type: 'number',
+      }),
+      forProof(['numeric'], {
+        name: 'maxValue',
+        label: 'Maximum',
+        type: 'number',
+      }),
+      forProof(['text'], {
+        name: 'prompt',
+        label: 'Prompt',
+        type: 'text',
+        help: 'What to write about',
+      }),
+      forProof(['text'], {
+        name: 'minLength',
+        label: 'Minimum length (characters)',
+        type: 'number',
+      }),
+      forProof(['lines'], {
+        name: 'phrase',
+        label: 'Phrase to write',
+        type: 'text',
+        required: true,
+      }),
+      forProof(['lines'], {
+        name: 'repetitions',
+        label: 'Times to write it',
+        type: 'number',
+        required: true,
+      }),
+      forProof(['timer'], {
+        name: 'seconds',
+        label: 'Duration (seconds)',
+        type: 'number',
+        required: true,
+      }),
+      forProof(['choice'], {
+        name: 'choices',
+        label: 'Choices',
+        type: 'strings',
+        required: true,
+      }),
+      forProof(['quiz'], {
+        name: 'questions',
+        label: 'Questions',
+        type: 'strings',
+        required: true,
+        help: 'One per entry, as "Question | Answer"',
+      }),
+      forProof(['media'], {
+        name: 'allowedMedia',
+        label: 'Accepted proof',
+        type: 'select',
+        default: 'photo',
+        options: [
+          { label: 'Photo', value: 'photo' },
+          { label: 'Video', value: 'video' },
+          { label: 'Audio', value: 'audio' },
+          { label: 'Any', value: 'any' },
+        ],
+      }),
+      forProof(['location'], {
+        name: 'place',
+        label: 'Place',
+        type: 'string',
+        required: true,
+        help: 'e.g. "the gym"',
+      }),
+      forProof(['location'], {
+        name: 'radiusMeters',
+        label: 'Allowed distance (metres)',
+        type: 'number',
+      }),
       { name: 'bonusTask', label: 'Bonus task', type: 'text' },
       { name: 'timeOptions', label: 'Time options', type: 'strings' },
       {
@@ -173,14 +288,25 @@ function validate(catalog, body) {
   }
 
   for (const field of catalog.fields) {
+    // Settings for a different proof type are neither required nor kept
+    if (
+      field.showWhen &&
+      !field.showWhen.in.includes(value[field.showWhen.field])
+    ) {
+      continue;
+    }
+
     let v = body[field.name];
     const missing =
-      v === undefined || v === null || (typeof v === 'string' && !v.trim());
+      v === undefined ||
+      v === null ||
+      (typeof v === 'string' && !v.trim()) ||
+      (Array.isArray(v) && v.length === 0);
 
     if (missing) {
       if (field.required) errors.push(`${field.label} is required`);
-      else if (field.type === 'boolean')
-        value[field.name] = field.default ?? false;
+      else if (field.default !== undefined) value[field.name] = field.default;
+      else if (field.type === 'boolean') value[field.name] = false;
       else if (field.type === 'strings' || field.type === 'ref')
         value[field.name] = [];
       continue;
@@ -189,6 +315,7 @@ function validate(catalog, body) {
     switch (field.type) {
       case 'string':
       case 'text':
+      case 'refOne':
         if (typeof v !== 'string') {
           errors.push(`${field.label} must be text`);
           continue;

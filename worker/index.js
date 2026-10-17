@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
+import { account } from './routes/account';
 import { admin } from './routes/admin';
 import { catalog } from './routes/catalog';
+import { dynamics } from './routes/dynamics';
 import { featureFlags } from './routes/feature-flags';
 import { sceneNegotiation } from './routes/scene-negotiation';
 import { slaveTraining } from './routes/slave-training';
@@ -14,6 +16,8 @@ app.route('/api/scene-negotiation', sceneNegotiation);
 app.route('/api/slave-training', slaveTraining);
 app.route('/api/admin', admin);
 app.route('/api/catalog', catalog);
+app.route('/api/account', account);
+app.route('/api/dynamics', dynamics);
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404));
 

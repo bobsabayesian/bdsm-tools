@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { errorMessage } from './errors';
 
 const baseUrl = '/api/admin';
 const TOKEN_KEY = 'admin-token';
@@ -28,12 +29,7 @@ const request = (method, url, data, token = getToken()) =>
     headers: { Authorization: `Bearer ${token}` },
   }).then((res) => res.data);
 
-/** Pull the most useful message out of a failed request */
-export const errorMessage = (e) =>
-  e?.response?.data?.errors?.join('. ') ??
-  e?.response?.data?.error ??
-  e?.message ??
-  'Unknown error';
+export { errorMessage };
 
 export const isUnauthorized = (e) => e?.response?.status === 401;
 

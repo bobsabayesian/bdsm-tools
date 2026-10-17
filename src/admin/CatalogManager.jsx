@@ -56,12 +56,14 @@ function FieldInput({ field, options, ...formProps }) {
       );
     case 'ref':
       return <Select mode='tags' options={options} {...formProps} />;
+    case 'refOne':
+      return <Select allowClear showSearch options={options} {...formProps} />;
     default:
       return <Input {...formProps} />;
   }
 }
 
-function renderCell(field, value) {
+function renderCell(field, value, options) {
   if (value === undefined || value === null) return null;
   switch (field.type) {
     case 'boolean':
@@ -71,6 +73,8 @@ function renderCell(field, value) {
       return value.map((v) => <Tag key={v}>{v}</Tag>);
     case 'select':
       return field.options.find((o) => o.value === value)?.label ?? value;
+    case 'refOne':
+      return options?.find((o) => o.value === value)?.label ?? value;
     default:
       return value;
   }
@@ -102,7 +106,9 @@ export default function CatalogManager({
     // Suggestions for `ref` fields come from the referenced catalog's keys
     const refs = [
       ...new Set(
-        catalog.fields.filter((f) => f.type === 'ref').map((f) => f.catalog),
+        catalog.fields
+          .filter((f) => f.type === 'ref' || f.type === 'refOne')
+          .map((f) => f.catalog),
       ),
     ].filter((ref) => catalogs[ref]);
     Promise.all(
@@ -135,14 +141,13 @@ export default function CatalogManager({
   const open = (item) => setEditing(item);
 
   // Values the form starts with when it opens
+  const defaults = Object.fromEntries(
+    catalog.fields
+      .filter((f) => f.default !== undefined)
+      .map((f) => [f.name, f.default]),
+  );
   const initialValues =
-    editing === 'new'
-      ? Object.fromEntries(
-          catalog.fields
-            .filter((f) => f.default !== undefined)
-            .map((f) => [f.name, f.default]),
-        )
-      : editing;
+    editing === 'new' ? defaults : { ...defaults, ...editing };
 
   const save = (values) => {
     setSaving(true);
@@ -171,12 +176,13 @@ export default function CatalogManager({
 
   const columns = [
     ...catalog.fields
+      .filter((f) => f.inTable !== false)
       .filter((f) => f.type !== 'text' || f.name === catalog.titleField)
       .map((field) => ({
         title: field.label,
         dataIndex: field.name,
         ellipsis: field.type === 'text' || field.type === 'string',
-        render: (value) => renderCell(field, value),
+        render: (value) => renderCell(field, value, refOptions[field.catalog]),
         sorter:
           field.type === 'string' || field.type === 'text'
             ? (a, b) => (a[field.name] ?? '').localeCompare(b[field.name] ?? '')
@@ -246,18 +252,37 @@ export default function CatalogManager({
           onFinish={save}
           onValuesChange={suggestKey}
         >
-          {catalog.fields.map((field) => (
-            <Form.Item
-              key={field.name}
-              name={field.name}
-              label={field.label}
-              extra={field.help}
-              rules={fieldRules(field)}
-              valuePropName={field.type === 'boolean' ? 'checked' : 'value'}
-            >
-              <FieldInput field={field} options={refOptions[field.catalog]} />
-            </Form.Item>
-          ))}
+          {catalog.fields.map((field) => {
+            const item = (
+              <Form.Item
+                key={field.name}
+                name={field.name}
+                label={field.label}
+                extra={field.help}
+                rules={fieldRules(field)}
+                valuePropName={field.type === 'boolean' ? 'checked' : 'value'}
+              >
+                <FieldInput field={field} options={refOptions[field.catalog]} />
+              </Form.Item>
+            );
+            if (!field.showWhen) return item;
+
+            // Only show settings that apply to the current value of another field
+            const { field: controller, in: values } = field.showWhen;
+            return (
+              <Form.Item
+                key={field.name}
+                noStyle
+                shouldUpdate={(before, after) =>
+                  before[controller] !== after[controller]
+                }
+              >
+                {({ getFieldValue }) =>
+                  values.includes(getFieldValue(controller)) ? item : null
+                }
+              </Form.Item>
+            );
+          })}
         </Form>
       </Modal>
     </>

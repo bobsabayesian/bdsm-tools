@@ -71,3 +71,28 @@ Admins manage task types, genders, kinks, body parts, equipment and slave traini
 the UI and kept in session storage.
 
 Catalogs are defined in `worker/catalogs.js` - adding an entry there adds it to the API and UI.
+
+## Accounts and dynamics
+
+People sign up with a username and password (no email). The recovery code shown once at sign-up
+is the only way to reset a forgotten password. A person can be in any number of **dynamics**
+(a pair, or just themselves) and nobody is told about the others: partners see only the alias
+chosen for that dynamic, never a username or user id. People join by invitation code rather than
+by searching for each other.
+
+Either person can pause or end a dynamic at any time, with nobody's approval. They are invited to
+say why but never required to. While a dynamic runs each person sees the other's last-active time;
+when it ends that time is frozen.
+
+Account and dynamic routes live in `worker/routes/account.js` and `worker/routes/dynamics.js`; the
+screens are in `src/account/`. To check the whole flow against a running Worker (on a fresh local
+database, as sign-ups are rate limited per IP):
+
+```bash
+$ BASE=http://localhost:8787 node scripts/smoke-accounts.mjs
+```
+
+For local testing, `npm run seed:users` (with `npm run dev:api` running) creates the accounts
+`dom-test`, `sub-test` and `switch-test` (password `test-password-123`), with the first two
+already in a dynamic together. It refuses to run against anything but localhost. Use separate
+private/incognito windows to be logged in as two people at once.
