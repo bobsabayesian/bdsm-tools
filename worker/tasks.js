@@ -25,10 +25,19 @@ const keysOf = (selections, catalog) =>
  * Returns { assignable, reasons, hardLimits, softLimits } where each reason is
  *   { code: 'proof' }                      - needs a proof type not yet supported
  *   { code: 'body-part', keys: [...] }     - needs body parts they have not included
- *   { code: 'equipment', keys: [...] }     - needs equipment they do not have
+ *   { code: 'in-bounds-body' | 'clothing' | 'equipment' | 'space', keys: [...] } - likewise (from "What's in bounds?")
  * (hard limits are listed separately). Soft limits never make a task unavailable:
  * they are flagged, and the assigner must attest (see assessAssignment).
  */
+// [field on the task, list it refers to, reason code]
+const NEEDS = [
+  ['requiresBodyPart', 'bodyParts', 'body-part'], // My Body
+  ['requiresBoundsBody', 'boundsBody', 'in-bounds-body'],
+  ['requiresClothing', 'boundsClothing', 'clothing'],
+  ['requiresEquipment', 'equipment', 'equipment'],
+  ['requiresSpaces', 'boundsSpaces', 'space'],
+];
+
 export const availability = (task, selections) => {
   const reasons = [];
 
@@ -36,19 +45,12 @@ export const availability = (task, selections) => {
     reasons.push({ code: 'proof' });
   }
 
-  const parts = keysOf(selections, 'bodyParts');
-  const missingParts = (task.requiresBodyPart ?? []).filter(
-    (k) => !parts.has(k),
-  );
-  if (missingParts.length)
-    reasons.push({ code: 'body-part', keys: missingParts });
-
-  const gear = keysOf(selections, 'equipment');
-  const missingGear = (task.requiresEquipment ?? []).filter(
-    (k) => !gear.has(k),
-  );
-  if (missingGear.length)
-    reasons.push({ code: 'equipment', keys: missingGear });
+  // Everything a task needs must be in bounds for the person who would do it
+  for (const [field, catalog, code] of NEEDS) {
+    const chosen = keysOf(selections, catalog);
+    const missing = (task[field] ?? []).filter((k) => !chosen.has(k));
+    if (missing.length) reasons.push({ code, keys: missing });
+  }
 
   const { hardLimits, softLimits } = assessAssignment(task, selections);
   return {

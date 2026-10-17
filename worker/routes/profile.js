@@ -16,9 +16,15 @@ import { DEFAULT_MIN_DAYS, wholeDays } from '../rules';
  */
 
 // In the order setup walks through them
+// My Body is its own screen. "What's in bounds?" is four lists on another
+// (body & anatomy, clothing, items, spaces): each is saved and skipped
+// separately here so the lists can change independently.
 const STEPS = {
   bodyParts: { states: ['yes'], sided: false },
+  boundsBody: { states: ['yes'], sided: false },
+  boundsClothing: { states: ['yes'], sided: false },
   equipment: { states: ['yes'], sided: false },
+  boundsSpaces: { states: ['yes'], sided: false },
   kinks: { states: LEVELS, sided: true },
 };
 
@@ -83,10 +89,18 @@ const readSteps = async (db, userId) => {
   return JSON.parse(row.profile_steps);
 };
 
-const writeStep = (db, userId, steps, step, status) =>
+// One atomic update, so several lists being saved at once cannot overwrite each
+// other's "done". A finished step is never changed to "skipped".
+const writeStep = (db, userId, step, status) =>
   db
-    .prepare('UPDATE users SET profile_steps = ? WHERE id = ?')
-    .bind(JSON.stringify({ ...steps, [step]: status }), userId);
+    .prepare(
+      `UPDATE users SET profile_steps = CASE
+         WHEN ?3 = 'skipped' AND json_extract(profile_steps, '$.' || ?2) = 'done' THEN profile_steps
+         ELSE json_set(profile_steps, '$.' || ?2, ?3)
+       END
+       WHERE id = ?1`,
+    )
+    .bind(userId, step, status);
 
 profile.get('/', async (c) => {
   const db = c.env.DB;
@@ -283,7 +297,7 @@ profile.put('/:step', async (c) => {
         )
         .bind(userId, step, key, direction, state, now),
     ),
-    writeStep(db, userId, await readSteps(db, userId), step, 'done'),
+    writeStep(db, userId, step, 'done'),
     markShared(db, userId, now),
   ]);
   return c.body(null, 204);
@@ -298,11 +312,8 @@ profile.post('/steps/:step/skip', async (c) => {
     return c.json({ error: 'Not found' }, 404);
   }
 
-  const steps = await readSteps(db, userId);
   await db.batch([
-    ...(steps[step] === 'done'
-      ? []
-      : [writeStep(db, userId, steps, step, 'skipped')]),
+    writeStep(db, userId, step, 'skipped'),
     markShared(db, userId, new Date().toISOString()),
   ]);
   return c.body(null, 204);

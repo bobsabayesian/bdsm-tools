@@ -109,11 +109,65 @@ assert.ok(
   'presets only contain real parts',
 );
 
+step("setup: What's in bounds? has its own lists, separate from My Body");
+const catalogOf = async (name) =>
+  (await fetch(`${BASE}/api/catalog/${name}`)).json();
+const [boundsBody, boundsClothing, items] = await Promise.all([
+  catalogOf('boundsBody'),
+  catalogOf('boundsClothing'),
+  catalogOf('equipment'),
+]);
+assert.ok(
+  boundsBody.length >= 40 &&
+    boundsBody.every((i) => i.value && i.label && i.group && i.description),
+);
+assert.ok(
+  boundsClothing.length >= 15 &&
+    boundsClothing.every((i) => i.value && i.label && i.group),
+);
+assert.ok(items.length >= 20);
+assert.deepEqual(
+  await catalogOf('boundsSpaces'),
+  [],
+  'spaces have none yet, so that section stays hidden',
+);
+assert.ok(
+  !boundsBody.some((i) => i.value === 'ass'),
+  'My Body keeps its own, coarser list',
+);
+const quick = await catalogOf('boundsPresets');
+assert.ok(quick.length >= 5);
+const exists = (list, keys) =>
+  keys.every((k) => list.some((i) => i.value === k));
+for (const q of quick) {
+  assert.ok(
+    exists(boundsBody, q.parts) &&
+      exists(boundsClothing, q.clothing) &&
+      exists(items, q.equipment),
+    `${q.label} only names real things`,
+  );
+}
+assert.ok(
+  quick.some((q) => q.clothing.length > 0) &&
+    quick.some((q) => q.parts.length > 0),
+  'quick starts reach into more than one list',
+);
+assert.ok(
+  !quick.some(
+    (q) =>
+      q.value !== 'select-everything' &&
+      [...q.parts, ...q.clothing].length > 40,
+  ),
+  'no quick start is "everything"',
+);
+
 step('setup: body parts are chosen, validated and private');
 assert.equal((await new Person('x').call('GET', '/profile')).status, 401);
 let profile = (await b.call('GET', '/profile')).json;
 assert.deepEqual(profile.steps, [
   { id: 'bodyParts', status: null },
+  { id: 'boundsBody', status: null },
+  { id: 'boundsClothing', status: null },
   { id: 'equipment', status: null },
 ]);
 assert.equal(profile.nextStep, 'bodyParts');
@@ -151,7 +205,7 @@ assert.deepEqual(profile.selections.bodyParts.map((x) => x.key).sort(), [
   'pussy',
 ]);
 assert.equal(profile.steps[0].status, 'done');
-assert.equal(profile.nextStep, 'equipment', 'equipment comes next');
+assert.equal(profile.nextStep, 'boundsBody', "What's in bounds? comes next");
 await b.call('PUT', '/profile/bodyParts', { keys: ['ass'] });
 assert.deepEqual(
   (await b.call('GET', '/profile')).json.selections.bodyParts.map((x) => x.key),
@@ -173,7 +227,7 @@ profile = (await c.call('GET', '/profile')).json;
 assert.equal(profile.steps[0].status, 'skipped');
 assert.equal(
   profile.nextStep,
-  'equipment',
+  'boundsBody',
   'a skipped step is not nagged about - on to the next',
 );
 await c.call('PUT', '/profile/bodyParts', { keys: ['throat'] });
@@ -219,12 +273,96 @@ assert.deepEqual(profile.selections.equipment.map((x) => x.key).sort(), [
   'blindfold',
   'rope',
 ]);
-assert.equal(profile.nextStep, null, 'body parts and equipment are done');
 assert.equal(
-  (await c.call('POST', '/profile/steps/equipment/skip', {})).status,
+  profile.nextStep,
+  'boundsBody',
+  'the other in-bounds lists are still to do',
+);
+
+step("setup: What's in bounds? is chosen one list at a time, and checked");
+assert.equal(
+  (await b.call('PUT', '/profile/boundsBody', { keys: ['neck', 'nonsense'] }))
+    .status,
+  400,
+);
+assert.equal(
+  (await b.call('PUT', '/profile/boundsBody', { keys: ['ass'] })).status,
+  400,
+  "'ass' is a My Body part, not one of these",
+);
+assert.equal(
+  (await b.call('PUT', '/profile/boundsClothing', { keys: ['thong', 'mouth'] }))
+    .status,
+  400,
+  'clothing only takes clothing',
+);
+assert.equal(
+  (await b.call('PUT', '/profile/boundsSpaces', { keys: [] })).status,
+  404,
+  'no spaces exist, so there is no step',
+);
+assert.equal(
+  (
+    await b.call('PUT', '/profile/boundsBody', {
+      keys: ['neck', 'feet', 'neck'],
+    })
+  ).status,
   204,
 );
+assert.equal(
+  (await b.call('PUT', '/profile/boundsClothing', { keys: ['thong', 'pants'] }))
+    .status,
+  204,
+);
+profile = (await b.call('GET', '/profile')).json;
+assert.deepEqual(profile.selections.boundsBody.map((x) => x.key).sort(), [
+  'feet',
+  'neck',
+]);
+assert.deepEqual(profile.selections.boundsClothing.map((x) => x.key).sort(), [
+  'pants',
+  'thong',
+]);
+assert.deepEqual(
+  profile.selections.bodyParts.map((x) => x.key),
+  [],
+  'My Body is untouched',
+);
+assert.equal(profile.nextStep, null, "My Body and What's in bounds? are done");
+for (const step of ['boundsBody', 'boundsClothing', 'equipment']) {
+  assert.equal(
+    (await c.call('POST', `/profile/steps/${step}/skip`, {})).status,
+    204,
+  );
+}
 assert.equal((await c.call('GET', '/profile')).json.nextStep, null);
+
+step('saving several lists at once must not lose any of them');
+const racer = new Person('racer-account');
+assert.equal((await racer.signup()).status, 201);
+await Promise.all([
+  racer.call('PUT', '/profile/bodyParts', { keys: ['mouth'] }),
+  racer.call('PUT', '/profile/boundsBody', { keys: ['neck'] }),
+  racer.call('PUT', '/profile/boundsClothing', { keys: ['pants'] }),
+  racer.call('PUT', '/profile/equipment', { keys: ['rope'] }),
+]);
+const raced = (await racer.call('GET', '/profile')).json;
+assert.deepEqual(
+  raced.steps.map((x) => x.status),
+  ['done', 'done', 'done', 'done'],
+  'all four are marked done',
+);
+assert.equal(raced.nextStep, null);
+await Promise.all(
+  ['boundsBody', 'equipment'].map((st) =>
+    racer.call('POST', `/profile/steps/${st}/skip`, {}),
+  ),
+);
+assert.deepEqual(
+  (await racer.call('GET', '/profile')).json.steps.map((x) => x.status),
+  ['done', 'done', 'done', 'done'],
+  'skipping never undoes a finished step',
+);
 
 step('the Me tab: optional details, validated, never required');
 profile = (await b.call('GET', '/profile')).json;
@@ -422,7 +560,7 @@ if (process.env.ADMIN_TOKEN) {
   profile = (await b.call('GET', '/profile')).json;
   assert.deepEqual(
     profile.steps.map((x) => x.id),
-    ['bodyParts', 'equipment', 'kinks'],
+    ['bodyParts', 'boundsBody', 'boundsClothing', 'equipment', 'kinks'],
   );
   assert.equal(
     profile.nextStep,
@@ -659,7 +797,7 @@ assert.deepEqual(
   'Bob is the same person in every dynamic',
 );
 assert.ok(
-  !/feet|alice/i.test(carolSees.text),
+  !/alice/i.test(carolSees.text),
   "Carol learns nothing about Bob's other dynamic",
 );
 assert.equal((await a.call('POST', '/profile/share', {})).status, 204);

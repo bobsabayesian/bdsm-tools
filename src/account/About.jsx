@@ -5,14 +5,14 @@ import PageHeader from '../components/PageHeader';
 import api from '../services/account-api';
 import useAccount from '../state/useAccount';
 import BodyPartsStep from './BodyPartsStep';
-import EquipmentStep from './EquipmentStep';
+import BoundsStep from './BoundsStep';
 import KinksStep from './KinksStep';
 import MeSection from './MeSection';
 
 const TABS = [
   { key: 'me', label: 'Me', Section: MeSection },
   { key: 'body', label: 'My Body', Section: BodyPartsStep },
-  { key: 'equipment', label: 'My Equipment', Section: EquipmentStep },
+  { key: 'bounds', label: "What's in bounds?", Section: BoundsStep },
   { key: 'kinks', label: 'My Kinks', Section: KinksStep, needs: 'kinks' },
 ];
 
@@ -69,6 +69,10 @@ export default function About() {
 
   const visible = TABS.filter((t) => !t.needs || steps.includes(t.needs));
   if (!tab) return <Navigate to='/account/about/me' replace />;
+  // "What's in bounds?" replaced My Equipment
+  if (tab === 'equipment') {
+    return <Navigate to='/account/about/bounds' replace />;
+  }
   if (!visible.some((t) => t.key === tab)) {
     return <Navigate to='/account/about/me' replace />;
   }

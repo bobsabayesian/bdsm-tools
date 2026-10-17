@@ -52,6 +52,9 @@ export default function AssignTaskModal({
   const [form] = Form.useForm();
   const { items: bodyParts } = useCatalog('bodyParts');
   const { items: equipment } = useCatalog('equipment');
+  const { items: boundsBody } = useCatalog('boundsBody');
+  const { items: boundsClothing } = useCatalog('boundsClothing');
+  const { items: boundsSpaces } = useCatalog('boundsSpaces');
   const { items: kinks } = useCatalog('kinks');
 
   const [tab, setTab] = React.useState('library');
@@ -108,10 +111,18 @@ export default function AssignTaskModal({
         parts.push(
           `needs ${nameList(bodyParts, reason.keys)}, which ${partner} has not included`,
         );
-      if (reason.code === 'equipment')
-        parts.push(
-          `needs ${nameList(equipment, reason.keys)}, which ${partner} does not have`,
-        );
+      // Everything from "What's in bounds?" is put to the same test
+      for (const [code, list] of [
+        ['in-bounds-body', boundsBody],
+        ['clothing', boundsClothing],
+        ['equipment', equipment],
+        ['space', boundsSpaces],
+      ]) {
+        if (reason.code === code)
+          parts.push(
+            `needs ${nameList(list, reason.keys)}, which ${partner} has not put in bounds`,
+          );
+      }
     }
     if (a.hardLimits.length) {
       parts.push(
@@ -159,7 +170,10 @@ export default function AssignTaskModal({
   );
   const refOptions = {
     bodyParts: asOptions(bodyParts),
+    boundsBody: asOptions(boundsBody),
+    boundsClothing: asOptions(boundsClothing),
     equipment: asOptions(equipment),
+    boundsSpaces: asOptions(boundsSpaces),
     kinks: asOptions(kinks),
   };
 

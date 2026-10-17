@@ -81,6 +81,8 @@ await admin('/catalogs/kinks/items', {
 });
 await sub.call('PUT', '/profile/bodyParts', { keys: ['mouth'] });
 await sub.call('PUT', '/profile/equipment', { keys: ['rope'] });
+await sub.call('PUT', '/profile/boundsBody', { keys: ['neck'] });
+await sub.call('PUT', '/profile/boundsClothing', { keys: ['pants'] });
 await sub.call('PUT', '/profile/kinks', {
   choices: [
     { key: 'spanking', direction: 'receive', state: 'hard-limit' },
@@ -94,6 +96,10 @@ const add = async (name, task) =>
 await add('Kneel', {});
 await add('Needs feet', { requiresBodyPart: ['feet'] });
 await add('Needs rope', { requiresEquipment: ['rope'] });
+await add('Needs neck', { requiresBoundsBody: ['neck'] });
+await add('Needs feet in bounds', { requiresBoundsBody: ['feet'] });
+await add('Wear pants', { requiresClothing: ['pants'] });
+await add('Wear a thong', { requiresClothing: ['thong'] });
 await add('Spank', { kinksReceiving: ['spanking'] });
 await add('Blindfolded', { kinksReceiving: ['blindfolds'] });
 await add('Photo', { proof: 'media', allowedMedia: 'photo' });
@@ -185,6 +191,24 @@ assert.deepEqual(by['Needs feet'].reasons, [
   { code: 'body-part', keys: ['feet'] },
 ]);
 assert.equal(by['Needs rope'].assignable, true, 'they have the rope');
+assert.equal(by['Needs neck'].assignable, true, 'their neck is in bounds');
+assert.deepEqual(by['Needs feet in bounds'].reasons, [
+  { code: 'in-bounds-body', keys: ['feet'] },
+]);
+assert.equal(by['Wear pants'].assignable, true);
+assert.deepEqual(by['Wear a thong'].reasons, [
+  { code: 'clothing', keys: ['thong'] },
+]);
+// My Body is a separate list: 'mouth' is in My Body but not in bounds
+assert.equal(
+  (
+    await dom.call('POST', `${P}/tasks`, {
+      task: { task: 'Use your mouth', requiresBoundsBody: ['mouth'] },
+    })
+  ).json.code,
+  'unavailable',
+  'My Body does not put anything in bounds',
+);
 assert.deepEqual(by.Spank.hardLimits, [
   { key: 'spanking', direction: 'receive' },
 ]);

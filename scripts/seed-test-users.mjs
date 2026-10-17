@@ -133,6 +133,16 @@ if (ADMIN) {
       task: 'Wear a blindfold while you do your chores',
       kinksReceiving: ['blindfolds'],
     },
+    {
+      task: 'Wear a thong under your clothes today',
+      requiresClothing: ['thong'],
+    },
+    {
+      task: 'Spend ten minutes kneeling on the floor',
+      proof: 'timer',
+      seconds: 600,
+      requiresBoundsBody: ['knees'],
+    },
   ])
     if (!existingTasks.has(task.task))
       await admin('/catalogs/tasks/items', task);
@@ -146,15 +156,33 @@ const profiles = {
   'dom-test': {
     parts: ['mouth', 'hands', 'feet'],
     gear: ['rope', 'blindfold', 'wrist restraints'],
+    bounds: ['neck', 'knees', 'hands', 'feet'],
+    clothing: ['pants', 'underwear-everyday'],
   },
   'sub-test': {
     parts: ['mouth', 'hands', 'feet', 'ass', 'thighs'],
     gear: ['rope', 'blindfold'],
+    bounds: ['neck', 'knees', 'wrists', 'feet', 'ass-cheeks'],
+    clothing: ['pants', 'underwear-everyday', 'thong'],
   },
-  'switch-test': { parts: ['mouth', 'hands'], gear: ['rope'] },
+  'switch-test': {
+    parts: ['mouth', 'hands'],
+    gear: ['rope'],
+    bounds: ['neck', 'hands'],
+    clothing: ['pants'],
+  },
 };
-for (const [username, { parts, gear }] of Object.entries(profiles)) {
+for (const [username, { parts, gear, bounds, clothing }] of Object.entries(
+  profiles,
+)) {
   await call(sessions[username], 'PUT', '/profile/bodyParts', { keys: parts });
+  // "What's in bounds?" - body & anatomy, clothing and items (spaces: none yet)
+  await call(sessions[username], 'PUT', '/profile/boundsBody', {
+    keys: bounds,
+  });
+  await call(sessions[username], 'PUT', '/profile/boundsClothing', {
+    keys: clothing,
+  });
   await call(sessions[username], 'PUT', '/profile/equipment', { keys: gear });
   await call(sessions[username], 'PUT', '/profile/me', {
     pronouns: ['they/them'],

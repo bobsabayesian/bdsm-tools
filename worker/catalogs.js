@@ -74,6 +74,22 @@ const forProof = (proofs, field) => ({
   inTable: false,
 });
 
+// Where an item sits on the "What's in bounds?" screen
+const placement = [
+  {
+    name: 'order',
+    label: 'Position',
+    type: 'number',
+    help: 'Lower numbers are shown first on the setup screen',
+  },
+  {
+    name: 'group',
+    label: 'Group',
+    type: 'string',
+    help: 'Listed under this heading on the setup screen',
+  },
+];
+
 const catalogs = {
   taskCategories: simpleCatalog('Task categories', 'catalog-task-categories'),
   // Offered on the optional "Me" tab - people can also just describe themselves
@@ -166,8 +182,8 @@ const catalogs = {
     ],
     { public: true },
   ),
-  // Quick-start bundles on the setup screen. They only add to what a person
-  // has ticked, so name them for the parts they contain, not for a kind of person.
+  // Quick starts on the My Body screen. They only add to what a person has
+  // ticked, so name them for the parts they contain, not for a kind of person.
   bodyPartPresets: simpleCatalog(
     'Body part presets',
     'catalog-body-part-presets',
@@ -182,9 +198,58 @@ const catalogs = {
     ],
     { public: true },
   ),
-  equipment: simpleCatalog('Equipment', 'catalog-equipment', [], {
-    public: true,
-  }),
+  // "What's in bounds?" is its own screen (separate from My Body, and it replaces
+  // the old My Equipment): four lists a person can put in bounds for tasks - body
+  // & anatomy, clothing, items (the equipment list) and spaces. Each has its own
+  // catalog so a task can ask for any of them.
+  boundsBody: simpleCatalog(
+    'In bounds: body & anatomy',
+    'catalog-bounds-body',
+    placement,
+    { public: true },
+  ),
+  boundsClothing: simpleCatalog(
+    'In bounds: clothing',
+    'catalog-bounds-clothing',
+    placement,
+    { public: true },
+  ),
+  equipment: simpleCatalog(
+    'In bounds: items (equipment)',
+    'catalog-equipment',
+    placement,
+    { public: true },
+  ),
+  boundsSpaces: simpleCatalog(
+    'In bounds: spaces',
+    'catalog-bounds-spaces',
+    placement,
+    { public: true },
+  ),
+  // Quick starts on the "What's in bounds?" screen. They only ever add to what a
+  // person has ticked, so name them for what they contain, never for a kind of
+  // person. A quick start can reach into any of the four lists.
+  boundsPresets: simpleCatalog(
+    'In bounds: quick starts',
+    'catalog-bounds-presets',
+    [
+      {
+        name: 'parts',
+        label: 'Body & anatomy',
+        type: 'ref',
+        catalog: 'boundsBody',
+      },
+      {
+        name: 'clothing',
+        label: 'Clothing',
+        type: 'ref',
+        catalog: 'boundsClothing',
+      },
+      { name: 'equipment', label: 'Items', type: 'ref', catalog: 'equipment' },
+      { name: 'spaces', label: 'Spaces', type: 'ref', catalog: 'boundsSpaces' },
+    ],
+    { public: true },
+  ),
   // The key is the tool's address, e.g. "slave-training" for /tools/slave-training
   featureFlags: {
     title: 'Feature flags',
@@ -328,6 +393,25 @@ const catalogs = {
         label: 'Requires equipment',
         type: 'ref',
         catalog: 'equipment',
+      },
+      {
+        name: 'requiresBoundsBody',
+        label: 'Requires in bounds: body & anatomy',
+        type: 'ref',
+        catalog: 'boundsBody',
+        help: 'The finer list on "What\'s in bounds?" (not My Body)',
+      },
+      {
+        name: 'requiresClothing',
+        label: 'Requires in bounds: clothing',
+        type: 'ref',
+        catalog: 'boundsClothing',
+      },
+      {
+        name: 'requiresSpaces',
+        label: 'Requires in bounds: spaces',
+        type: 'ref',
+        catalog: 'boundsSpaces',
       },
       // From the point of view of the person doing the task. A task is never
       // given to someone with a hard limit on one of these.

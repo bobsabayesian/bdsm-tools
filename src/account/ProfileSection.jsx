@@ -5,6 +5,18 @@ import api, { errorMessage } from '../services/account-api';
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
+// "What's in bounds?" is four lists on one screen; say how far along it is
+const BOUNDS = ['boundsBody', 'boundsClothing', 'equipment', 'boundsSpaces'];
+function boundsText(steps, selections) {
+  const mine = steps.filter((s) => BOUNDS.includes(s.id));
+  const total = BOUNDS.reduce((n, id) => n + (selections[id]?.length ?? 0), 0);
+  const counted = plural(total, 'thing', 'things') + ' in bounds';
+  if (mine.every((s) => s.status === 'done')) return counted;
+  if (mine.every((s) => s.status === 'skipped')) return 'Skipped for now';
+  if (mine.every((s) => !s.status)) return 'Not done yet';
+  return `${counted} - more to look at`;
+}
+
 /** One line per tab of About me: what is there, and a way to edit it */
 function rows(profile) {
   const { steps, selections, me } = profile;
@@ -32,12 +44,9 @@ function rows(profile) {
       ),
     },
     {
-      tab: 'equipment',
-      title: 'My Equipment',
-      text: describe(
-        'equipment',
-        plural(selections.equipment.length, 'item', 'items'),
-      ),
+      tab: 'bounds',
+      title: "What's in bounds?",
+      text: boundsText(steps, selections),
     },
     ...(status('kinks') === undefined
       ? []

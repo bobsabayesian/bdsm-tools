@@ -4,6 +4,9 @@ import useCatalog from '../hooks/useCatalog';
 import api from '../services/account-api';
 import { LEVELS, LevelTag } from './limits';
 
+// The lists on "What's in bounds?" - a partner sees them all
+const BOUNDS = ['boundsBody', 'boundsClothing', 'equipment', 'boundsSpaces'];
+
 const SIDE_LABEL = { give: 'giving', receive: 'receiving' };
 
 // Items keep the catalog's order; anything an admin has since switched off is dropped
@@ -101,6 +104,11 @@ export default function PartnerProfile({ dynamic }) {
   const [profile, setProfile] = React.useState(null);
   const { items: bodyParts } = useCatalog('bodyParts');
   const { items: equipment } = useCatalog('equipment');
+  const inBounds = {
+    boundsBody: useCatalog('boundsBody').items,
+    boundsClothing: useCatalog('boundsClothing').items,
+    boundsSpaces: useCatalog('boundsSpaces').items,
+  };
   const { items: kinks } = useCatalog('kinks');
   const { items: genders } = useCatalog('genders');
 
@@ -137,10 +145,6 @@ export default function PartnerProfile({ dynamic }) {
     selections.bodyParts.map((p) => p.key),
   );
   const groups = [...new Set(parts.map((p) => p.group || 'Other'))];
-  const gear = labelled(
-    equipment,
-    selections.equipment.map((e) => e.key),
-  );
   const myGenders = labelled(genders, me.genders);
   const answeredKinks = kinks.filter((k) =>
     selections.kinks.some((a) => a.key === k.value),
@@ -215,16 +219,58 @@ export default function PartnerProfile({ dynamic }) {
         ),
     },
     {
-      key: 'equipment',
-      label: 'Equipment',
-      children:
-        steps.equipment !== 'done' ? (
-          <Nothing>{nobody}</Nothing>
-        ) : gear.length === 0 ? (
-          <Nothing>No equipment.</Nothing>
-        ) : (
-          gear.map((e) => <Tag key={e.value}>{e.label}</Tag>)
-        ),
+      key: 'bounds',
+      label: "What's in bounds?",
+      children: !BOUNDS.some((s) => steps[s] === 'done') ? (
+        <Nothing>{nobody}</Nothing>
+      ) : (
+        <Space orientation='vertical' size='middle' style={{ width: '100%' }}>
+          {[
+            ['boundsBody', 'Body & Anatomy'],
+            ['boundsClothing', 'Clothing, Underwear & Presentation'],
+            ['equipment', 'Items'],
+            ['boundsSpaces', 'Spaces'],
+          ]
+            .filter(
+              ([id]) =>
+                (id === 'equipment' ? equipment : inBounds[id]).length > 0,
+            )
+            .map(([id, title]) => {
+              const list = id === 'equipment' ? equipment : inBounds[id];
+              const chosen = labelled(
+                list,
+                selections[id].map((x) => x.key),
+              );
+              return (
+                <div key={id}>
+                  <Typography.Text strong>{title}</Typography.Text>
+                  <div>
+                    {chosen.length === 0 ? (
+                      <Nothing>Nothing in bounds.</Nothing>
+                    ) : (
+                      [...new Set(chosen.map((i) => i.group || ''))].map(
+                        (group) => (
+                          <div key={group} style={{ marginBottom: 4 }}>
+                            {group && (
+                              <Typography.Text type='secondary'>
+                                {group}:{' '}
+                              </Typography.Text>
+                            )}
+                            {chosen
+                              .filter((i) => (i.group || '') === group)
+                              .map((i) => (
+                                <Tag key={i.value}>{i.label}</Tag>
+                              ))}
+                          </div>
+                        ),
+                      )
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+        </Space>
+      ),
     },
     ...(kinks.length > 0
       ? [

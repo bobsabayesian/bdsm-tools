@@ -104,23 +104,26 @@ smaller, below it.
 ### About me
 
 A person's profile lives at **About me** (`/account/about`, linked as "My profile" in the header), with
-one tab each: **Me**, **My Body**, **My Equipment** and **My Kinks**. New people are walked through
-body parts, equipment and kinks once after signing up (`/account/setup`, every step skippable); after
+one tab each: **Me**, **My Body**, **What's in bounds?** and **My Kinks**. New people are walked through
+My Body, What's in bounds? and kinks once after signing up (`/account/setup`, every step skippable); after
 that About me is where everything is edited. Each tab saves on its own and shows a dot when it has
 unsaved changes. The people in a person's dynamics see exactly the same tabs, read-only, on the
 dynamic's page (`PartnerProfile`).
 
-- **A dynamic is titled with the two names in it**, yours first: you as "Sir" with a partner who is "Bob" see
-  "Sir - Bob" (Bob sees "Bob - Sir"). A **display name** on the Me tab is the name filled in for you when you
-  start or join a dynamic; it is private, and each dynamic can use a different name - partners only ever see the
-  name you use with them.
 - **Me** is optional and nothing depends on it: gender (from the admin "Genders" list, if any), pronouns
   (free text) and "things my partner should know".
 - **My Body** is about what someone wants _included_ in tasks, not their anatomy or identity - nobody
   is asked about sex or gender, the quick-start presets only ever add to what is ticked, and skipping
   is fine. Body parts, groups and presets are editable in the admin tool (`worker/catalogs.js`). When
   writing task text, please use neutral wording ("your", "they") rather than gendered pronouns.
-- **My Equipment** is a plain "I have this" list from the admin Equipment catalog.
+- **What's in bounds?** is its own tab, separate from My Body, and replaces the old My Equipment. One
+  screen holds four lists a person can put in bounds for tasks: **Body & Anatomy** (a finer list than My
+  Body), **Clothing, Underwear & Presentation**, **Items** (the equipment list) and **Spaces** (none yet, so
+  that section stays hidden until some are added). Quick starts (Everything except genitals, External only,
+  Penis and balls, Pussy, Everyday clothing & underwear, Common household items, Private indoor spaces) only
+  ever add, and one can reach into several lists; a quick start that would add nothing is not shown. The lists,
+  groups and quick starts are all editable in admin (`In bounds: ...`). Tasks can require things from any of
+  them, and are only offered when everything required is in bounds for the person who would do them.
 - **My Kinks** appears once at least one kink is active in admin (below).
 
 ### Kinks and limits

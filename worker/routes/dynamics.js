@@ -353,6 +353,15 @@ dynamics.get('/:id/profile', async (c) => {
       equipment: results
         .filter((row) => row.catalog === 'equipment')
         .map(({ key }) => ({ key })),
+      boundsBody: results
+        .filter((row) => row.catalog === 'boundsBody')
+        .map(({ key }) => ({ key })),
+      boundsClothing: results
+        .filter((row) => row.catalog === 'boundsClothing')
+        .map(({ key }) => ({ key })),
+      boundsSpaces: results
+        .filter((row) => row.catalog === 'boundsSpaces')
+        .map(({ key }) => ({ key })),
       kinks: results
         .filter((row) => row.catalog === 'kinks')
         .map(({ key, direction, state }) => ({ key, direction, state })),

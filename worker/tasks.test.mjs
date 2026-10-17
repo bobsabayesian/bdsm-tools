@@ -146,3 +146,41 @@ test('choices and quizzes', () => {
   assert.deepEqual(wrong.incorrect, [1], 'says which answers to retry');
   assert.equal(checkResponse(quiz, { answers: ['red'] }).ok, false);
 });
+
+test('everything from "What\'s in bounds?" is put to the same test, and named', () => {
+  const task = {
+    requiresBoundsBody: ['neck', 'feet'],
+    requiresClothing: ['thong'],
+    requiresSpaces: ['bedroom'],
+  };
+  const result = availability(task, [sel('boundsBody', 'neck')]);
+  assert.equal(result.assignable, false);
+  assert.deepEqual(result.reasons, [
+    { code: 'in-bounds-body', keys: ['feet'] },
+    { code: 'clothing', keys: ['thong'] },
+    { code: 'space', keys: ['bedroom'] },
+  ]);
+  assert.equal(
+    availability(task, [
+      sel('boundsBody', 'neck'),
+      sel('boundsBody', 'feet'),
+      sel('boundsClothing', 'thong'),
+      sel('boundsSpaces', 'bedroom'),
+    ]).assignable,
+    true,
+  );
+});
+
+test("My Body and What's in bounds? are separate lists", () => {
+  // 'feet' in My Body does not put 'feet' in bounds, and the other way round
+  assert.equal(
+    availability({ requiresBoundsBody: ['feet'] }, [sel('bodyParts', 'feet')])
+      .assignable,
+    false,
+  );
+  assert.equal(
+    availability({ requiresBodyPart: ['feet'] }, [sel('boundsBody', 'feet')])
+      .assignable,
+    false,
+  );
+});

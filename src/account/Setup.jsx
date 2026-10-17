@@ -5,17 +5,25 @@ import PageHeader from '../components/PageHeader';
 import api from '../services/account-api';
 import useAccount from '../state/useAccount';
 import BodyPartsStep from './BodyPartsStep';
-import EquipmentStep from './EquipmentStep';
+import BoundsStep from './BoundsStep';
 import KinksStep from './KinksStep';
 
+// My Body is one screen; body & anatomy, clothing, items and spaces together are
+// the next one, "What's in bounds?"
 const STEP_SCREENS = {
   bodyParts: BodyPartsStep,
-  equipment: EquipmentStep,
+  boundsBody: BoundsStep,
+  boundsClothing: BoundsStep,
+  equipment: BoundsStep,
+  boundsSpaces: BoundsStep,
   kinks: KinksStep,
 };
 const TAB_FOR_STEP = {
   bodyParts: 'body',
-  equipment: 'equipment',
+  boundsBody: 'bounds',
+  boundsClothing: 'bounds',
+  equipment: 'bounds',
+  boundsSpaces: 'bounds',
   kinks: 'kinks',
 };
 
