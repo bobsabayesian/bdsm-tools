@@ -13,7 +13,7 @@
     "test-build": "webpack --config webpack-dev.config.js --bail && npm run update-version",
     "test": "npm run lint && npm run test-compile && npm run test:worker",
     "test:worker": "node --test worker/*.test.mjs",
-    "seed:users": "node scripts/seed-test-users.mjs",
+    "seed:users": "node --env-file=.env scripts/seed-test-users.mjs",
     "test-compile": "webpack --config webpack-common.config.js --bail --mode development",
     "lint:fix": "npm run lint -- --fix",
     "update-version": "generate-version -s package -b dist",

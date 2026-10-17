@@ -452,6 +452,7 @@ assert.equal(
       title: 'Mine',
       body: 'x',
       attested: true,
+      lockDays: 7,
     })
   ).status,
   403,
@@ -460,6 +461,7 @@ assert.equal(
 const noAttest = await dom.call('POST', `${P}/rules`, {
   title: 'Greet me',
   body: 'Say good morning',
+  lockDays: 7,
 });
 assert.equal(noAttest.status, 400);
 assert.equal(
@@ -473,21 +475,244 @@ assert.equal(
       title: '',
       body: 'x',
       attested: true,
+      lockDays: 7,
     })
   ).status,
   400,
 );
+assert.equal(
+  (
+    await dom.call('POST', `${P}/rules`, {
+      title: 'Greet me',
+      body: 'Say good morning',
+      attested: true,
+    })
+  ).status,
+  400,
+  'the setter must say how long it stands',
+);
+for (const bad of [-1, 366, 2.5, '4']) {
+  assert.equal(
+    (
+      await dom.call('POST', `${P}/rules`, {
+        title: 'a',
+        body: 'b',
+        attested: true,
+        lockDays: bad,
+      })
+    ).status,
+    400,
+    `${bad} days is not allowed`,
+  );
+}
+
+step(
+  "a rule stands for the longer of what the dom asks and the sub's minimum (default 7 days)",
+);
+const week = 7 * 864e5;
 const rule = await dom.call('POST', `${P}/rules`, {
   title: 'Greet me',
   body: 'Say good morning',
   attested: true,
+  lockDays: 4,
 });
 assert.equal(rule.status, 201);
 assert.ok(rule.json.attestedAt, 'recorded that it was discussed');
+assert.equal(rule.json.lockDaysRequested, 4);
+assert.equal(
+  rule.json.lockDaysApplied,
+  7,
+  "asked for 4 but the sub's minimum is 7, so it is 7",
+);
+assert.ok(
+  Math.abs(new Date(rule.json.lockedUntil) - (Date.now() + week)) < 60000,
+);
+assert.equal(rule.json.locked, true);
+const longer = await dom.call('POST', `${P}/rules`, {
+  title: 'Longer',
+  body: 'x',
+  attested: true,
+  lockDays: 14,
+});
+assert.equal(
+  longer.json.lockDaysApplied,
+  14,
+  'asking for more than the minimum is fine',
+);
+
+step('the dom cannot change or retire a rule until the time is up');
+const changeAttempt = await dom.call('PUT', `${P}/rules/${rule.json.id}`, {
+  body: 'Say good morning by 9am',
+  attested: true,
+  lockDays: 7,
+});
+assert.equal(changeAttempt.status, 409);
+assert.equal(changeAttempt.json.code, 'rule-locked');
+assert.equal(changeAttempt.json.lockedUntil, rule.json.lockedUntil);
+const retireAttempt = await dom.call(
+  'POST',
+  `${P}/rules/${rule.json.id}/retire`,
+  {},
+);
+assert.equal(retireAttempt.status, 409, 'retiring is a change too');
+assert.equal(retireAttempt.json.code, 'rule-locked');
+assert.equal(
+  (await dom.call('GET', `${P}/rules`)).json.rules.find(
+    (r) => r.id === rule.json.id,
+  ).title,
+  'Greet me',
+  'nothing changed',
+);
+
+step(
+  'the sub can raise or lower their minimum; rules already set keep the lock they were set with',
+);
+assert.equal((await dom.call('GET', `${P}/rules`)).json.minDays, 7);
+assert.equal(
+  (await sub.call('PUT', '/profile/me', { ruleChangeMinDays: 30 })).status,
+  204,
+);
+assert.equal(
+  (await dom.call('GET', `${P}/rules`)).json.minDays,
+  30,
+  'the dom can see it',
+);
+const thirty = await dom.call('POST', `${P}/rules`, {
+  title: 'Thirty',
+  body: 'x',
+  attested: true,
+  lockDays: 4,
+});
+assert.equal(
+  thirty.json.lockDaysApplied,
+  30,
+  'a new rule uses the new minimum',
+);
+assert.equal(
+  (await dom.call('GET', `${P}/rules`)).json.rules.find(
+    (r) => r.id === rule.json.id,
+  ).lockDaysApplied,
+  7,
+  'the earlier rule is unchanged',
+);
+assert.equal(
+  (await sub.call('PUT', '/profile/me', { ruleChangeMinDays: 0 })).status,
+  204,
+);
+
+step(
+  'with no minimum, a rule can be changed straight away - and a change starts a new lock',
+);
+const free = await dom.call('POST', `${P}/rules`, {
+  title: 'Greet me kindly',
+  body: 'Say good morning',
+  attested: true,
+  lockDays: 0,
+});
+assert.equal(free.json.lockDaysApplied, 0);
+assert.equal(free.json.locked, false);
+assert.equal(
+  (
+    await dom.call('PUT', `${P}/rules/${free.json.id}`, {
+      body: 'Say good morning by 9am',
+    })
+  ).status,
+  400,
+  'asks again',
+);
+assert.equal(
+  (
+    await dom.call('PUT', `${P}/rules/${free.json.id}`, {
+      body: 'Say good morning by 9am',
+      attested: true,
+    })
+  ).status,
+  400,
+  'and for how long',
+);
+const edited = await dom.call('PUT', `${P}/rules/${free.json.id}`, {
+  body: 'Say good morning by 9am',
+  attested: true,
+  lockDays: 3,
+});
+assert.equal(edited.json.body, 'Say good morning by 9am');
+assert.equal(edited.json.title, 'Greet me kindly', 'untouched parts stay');
+assert.equal(edited.json.lockDaysApplied, 3);
+assert.equal(edited.json.locked, true, 'the change starts a fresh lock');
+assert.equal(
+  (
+    await dom.call('PUT', `${P}/rules/${free.json.id}`, {
+      body: 'again',
+      attested: true,
+      lockDays: 0,
+    })
+  ).status,
+  409,
+);
+assert.equal(
+  (
+    await sub.call('PUT', `${P}/rules/${free.json.id}`, {
+      body: 'x',
+      attested: true,
+      lockDays: 0,
+    })
+  ).status,
+  403,
+);
+
+step(
+  'retiring and bringing back: retiring waits for the lock, bringing back asks again and locks again',
+);
+const quick = (
+  await dom.call('POST', `${P}/rules`, {
+    title: 'Quick',
+    body: 'x',
+    attested: true,
+    lockDays: 0,
+  })
+).json;
+assert.equal(
+  (await dom.call('POST', `${P}/rules/${quick.id}/retire`, {})).status,
+  204,
+);
+assert.equal(
+  (await dom.call('GET', `${P}/rules`)).json.rules.find(
+    (r) => r.id === quick.id,
+  ).status,
+  'retired',
+);
+assert.equal(
+  (await dom.call('POST', `${P}/rules/${quick.id}/restore`, { lockDays: 2 }))
+    .status,
+  400,
+  'needs the attestation',
+);
+assert.equal(
+  (await dom.call('POST', `${P}/rules/${quick.id}/restore`, { attested: true }))
+    .status,
+  400,
+  'and a lock',
+);
+assert.equal(
+  (
+    await dom.call('POST', `${P}/rules/${quick.id}/restore`, {
+      attested: true,
+      lockDays: 2,
+    })
+  ).status,
+  204,
+);
+const restored = (await dom.call('GET', `${P}/rules`)).json.rules.find(
+  (r) => r.id === quick.id,
+);
+assert.equal(restored.status, 'active');
+assert.equal(restored.lockDaysApplied, 2);
+assert.equal(restored.locked, true);
+
+step('the sub comments; nothing is approved, and rules do not touch tasks');
 const rules = (await sub.call('GET', `${P}/rules`)).json;
-assert.equal(rules.rules.length, 1);
-assert.equal(rules.rules[0].title, 'Greet me');
 assert.equal(rules.you.canAssign, false);
+assert.ok(rules.rules.length >= 4);
 const target = `rule:${rule.json.id}`;
 assert.equal(
   (
@@ -515,7 +740,12 @@ assert.deepEqual(
     ['you', 'Sir', 'Yes, let us talk tonight'],
   ],
 );
-assert.equal((await sub.call('GET', `${P}/rules`)).json.rules[0].comments, 2);
+assert.equal(
+  (await sub.call('GET', `${P}/rules`)).json.rules.find(
+    (r) => r.id === rule.json.id,
+  ).comments,
+  2,
+);
 assert.equal(
   (await stranger.call('GET', `${P}/comments?target=${target}`)).status,
   404,
@@ -539,52 +769,11 @@ assert.equal(
   201,
   'tasks can be talked about too',
 );
-
-step(
-  'changing a rule asks again; retiring does not; bringing it back asks again',
-);
-assert.equal(
-  (
-    await dom.call('PUT', `${P}/rules/${rule.json.id}`, {
-      body: 'Say good morning by 9am',
-    })
-  ).status,
-  400,
-);
-const changed = await dom.call('PUT', `${P}/rules/${rule.json.id}`, {
-  body: 'Say good morning by 9am',
-  attested: true,
-});
-assert.equal(changed.json.body, 'Say good morning by 9am');
-assert.equal(changed.json.title, 'Greet me', 'untouched parts stay');
-assert.equal(
-  (
-    await sub.call('PUT', `${P}/rules/${rule.json.id}`, {
-      body: 'x',
-      attested: true,
-    })
-  ).status,
-  403,
-);
-assert.equal(
-  (await dom.call('POST', `${P}/rules/${rule.json.id}/retire`, {})).status,
-  204,
-);
-assert.equal(
-  (await dom.call('GET', `${P}/rules`)).json.rules[0].status,
-  'retired',
-);
-assert.equal(
-  (await dom.call('POST', `${P}/rules/${rule.json.id}/restore`, {})).status,
-  400,
-);
-assert.equal(
-  (
-    await dom.call('POST', `${P}/rules/${rule.json.id}/restore`, {
-      attested: true,
-    })
-  ).status,
-  204,
+assert.ok(
+  !JSON.stringify(
+    (await sub.call('GET', `${P}/tasks`)).json.assignments,
+  ).includes('ruleId'),
+  'tasks carry no link to rules',
 );
 
 step('a paused dynamic can be read but not changed');
@@ -645,6 +834,7 @@ assert.equal(
     await sub.call('POST', `${S}/rules`, {
       title: 'Early to bed',
       body: 'Lights out by 11',
+      lockDays: 3,
     })
   ).status,
   201,

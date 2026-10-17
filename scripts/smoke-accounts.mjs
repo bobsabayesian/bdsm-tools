@@ -228,7 +228,12 @@ assert.equal((await c.call('GET', '/profile')).json.nextStep, null);
 
 step('the Me tab: optional details, validated, never required');
 profile = (await b.call('GET', '/profile')).json;
-assert.deepEqual(profile.me, { genders: [], pronouns: [], about: '' });
+assert.deepEqual(profile.me, {
+  genders: [],
+  pronouns: [],
+  about: '',
+  ruleChangeMinDays: 7,
+});
 assert.equal(
   (await b.call('PUT', '/profile/me', { genders: ['nonsense'] })).status,
   400,
@@ -260,6 +265,7 @@ assert.deepEqual((await b.call('GET', '/profile')).json.me, {
   genders: [],
   pronouns: ['they/them', 'she/her'],
   about: 'I like a plan.',
+  ruleChangeMinDays: 7,
 });
 assert.equal(
   (await b.call('PUT', '/profile/me', {})).status,
@@ -270,6 +276,50 @@ await b.call('PUT', '/profile/me', {
   pronouns: ['they/them'],
   about: 'I like a plan.',
 });
+
+step('the Me tab also holds the rule change minimum (days), default 7');
+for (const bad of [-1, 366, 1.5, '7', null]) {
+  assert.equal(
+    (await b.call('PUT', '/profile/me', { ruleChangeMinDays: bad })).status,
+    400,
+    `${bad} is not allowed`,
+  );
+}
+assert.equal(
+  (await b.call('PUT', '/profile/me', { ruleChangeMinDays: 14 })).status,
+  204,
+);
+assert.equal((await b.call('GET', '/profile')).json.me.ruleChangeMinDays, 14);
+assert.equal(
+  (
+    await b.call('PUT', '/profile/me', {
+      pronouns: ['they/them'],
+      about: 'I like a plan.',
+    })
+  ).status,
+  204,
+);
+assert.equal(
+  (await b.call('GET', '/profile')).json.me.ruleChangeMinDays,
+  14,
+  'left alone when not sent',
+);
+assert.equal(
+  (await b.call('PUT', '/profile/me', { ruleChangeMinDays: 0 })).status,
+  204,
+  'zero is allowed',
+);
+// the Me tab always sends everything, so the last save restores the details
+assert.equal(
+  (
+    await b.call('PUT', '/profile/me', {
+      pronouns: ['they/them'],
+      about: 'I like a plan.',
+      ruleChangeMinDays: 7,
+    })
+  ).status,
+  204,
+);
 
 if (process.env.ADMIN_TOKEN) {
   step(
@@ -530,7 +580,12 @@ assert.deepEqual(
 );
 assert.deepEqual(
   seenByAlice.me,
-  { genders: [], pronouns: ['they/them'], about: 'I like a plan.' },
+  {
+    genders: [],
+    pronouns: ['they/them'],
+    about: 'I like a plan.',
+    ruleChangeMinDays: 7,
+  },
   'and so are the Me details',
 );
 assert.equal(

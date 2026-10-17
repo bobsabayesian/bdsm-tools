@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { noStore, requireJson, requireUser } from '../accounts';
 import { catalogs } from '../catalogs';
 import { LEVELS, sidesFor } from '../limits';
+import { DEFAULT_MIN_DAYS, wholeDays } from '../rules';
 
 /**
  * What a person has chosen to include or avoid. Everyone in a dynamic with them
@@ -58,10 +59,12 @@ const markShared = (db, userId, now) =>
     )
     .bind(now, userId);
 
-export const readAbout = (row) => ({
+// `minDays` is the person's own "rule change minimum" (kept on the user)
+export const readAbout = (row, minDays = DEFAULT_MIN_DAYS) => ({
   genders: row ? JSON.parse(row.genders) : [],
   pronouns: row ? JSON.parse(row.pronouns) : [],
   about: row ? row.about : '',
+  ruleChangeMinDays: minDays,
 });
 
 const readSteps = async (db, userId) => {
@@ -97,10 +100,13 @@ profile.get('/', async (c) => {
       .first(),
   ]);
 
-  const { profile_shared_at: sharedAt } = await db
-    .prepare('SELECT profile_shared_at FROM users WHERE id = ?')
-    .bind(userId)
-    .first();
+  const { profile_shared_at: sharedAt, rule_change_min_days: minDays } =
+    await db
+      .prepare(
+        'SELECT profile_shared_at, rule_change_min_days FROM users WHERE id = ?',
+      )
+      .bind(userId)
+      .first();
 
   const steps = available.map((id) => ({ id, status: done[id] ?? null }));
   return c.json({
@@ -110,7 +116,7 @@ profile.get('/', async (c) => {
       sharedAt,
       needsReview: !sharedAt && (results.length > 0 || !!aboutRow),
     },
-    me: readAbout(aboutRow),
+    me: readAbout(aboutRow, minDays),
     nextStep: steps.find((step) => !step.status)?.id ?? null,
     selections: Object.fromEntries(
       Object.keys(STEPS).map((id) => [
@@ -136,6 +142,11 @@ profile.put('/me', async (c) => {
   const genders = body.genders ?? [];
   const pronouns = body.pronouns ?? [];
   const about = body.about ?? '';
+  // How long a rule must stand before it can be changed; left alone if not sent
+  const minDays =
+    body.ruleChangeMinDays === undefined
+      ? undefined
+      : wholeDays(body.ruleChangeMinDays);
   const textList = (list) =>
     Array.isArray(list) &&
     list.every((item) => typeof item === 'string' && item.trim().length > 0);
@@ -145,7 +156,8 @@ profile.put('/me', async (c) => {
     pronouns.length > MAX_PRONOUNS ||
     pronouns.some((item) => item.length > MAX_PRONOUN_LENGTH) ||
     typeof about !== 'string' ||
-    about.length > MAX_ABOUT
+    about.length > MAX_ABOUT ||
+    minDays === null
   ) {
     return c.json({ error: 'Invalid details' }, 400);
   }
@@ -178,6 +190,13 @@ profile.put('/me', async (c) => {
         about.trim(),
         now,
       ),
+    ...(minDays === undefined
+      ? []
+      : [
+          db
+            .prepare('UPDATE users SET rule_change_min_days = ? WHERE id = ?')
+            .bind(minDays, userId),
+        ]),
     markShared(db, userId, now),
   ]);
   return c.body(null, 204);

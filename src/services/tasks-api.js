@@ -24,8 +24,8 @@ const listRules = (id) => call('get', `/${id}/rules`);
 const createRule = (id, rule) => call('post', `/${id}/rules`, rule);
 const updateRule = (id, rid, rule) => call('put', `/${id}/rules/${rid}`, rule);
 const retireRule = (id, rid) => call('post', `/${id}/rules/${rid}/retire`, {});
-const restoreRule = (id, rid, attested) =>
-  call('post', `/${id}/rules/${rid}/restore`, { attested });
+const restoreRule = (id, rid, body) =>
+  call('post', `/${id}/rules/${rid}/restore`, body);
 
 const comments = (id, target) =>
   call('get', `/${id}/comments?target=${encodeURIComponent(target)}`);

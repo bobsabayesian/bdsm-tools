@@ -13,6 +13,7 @@ import {
   Typography,
 } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
+import { SELECTED_DYNAMIC_KEY } from '../components/DynamicPage';
 import PageHeader from '../components/PageHeader';
 import api, { errorMessage } from '../services/account-api';
 import useAccount from '../state/useAccount';
@@ -215,20 +216,30 @@ export default function DynamicView() {
       )}
 
       {(status === 'active' || status === 'paused') && (
-        <Button
-          type='primary'
-          style={{ marginBottom: 24 }}
-          onClick={() => {
-            try {
-              localStorage.setItem('tasks-dynamic', JSON.stringify(id));
-            } catch {
-              // the selector will simply start on the first dynamic
-            }
-            navigate('/tasks');
-          }}
-        >
-          Tasks and rules
-        </Button>
+        <Space style={{ marginBottom: 24 }}>
+          {[
+            ['Tasks', '/tasks'],
+            ['Rules', '/rules'],
+          ].map(([label, path]) => (
+            <Button
+              key={path}
+              type={path === '/tasks' ? 'primary' : 'default'}
+              onClick={() => {
+                try {
+                  localStorage.setItem(
+                    SELECTED_DYNAMIC_KEY,
+                    JSON.stringify(id),
+                  );
+                } catch {
+                  // the selector will simply start on the first dynamic
+                }
+                navigate(path);
+              }}
+            >
+              {label}
+            </Button>
+          ))}
+        </Space>
       )}
 
       {history.length > 0 && (

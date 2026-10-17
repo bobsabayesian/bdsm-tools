@@ -1,5 +1,14 @@
 import React from 'react';
-import { App, Button, Input, Select, Space, Spin, Typography } from 'antd';
+import {
+  App,
+  Button,
+  Input,
+  InputNumber,
+  Select,
+  Space,
+  Spin,
+  Typography,
+} from 'antd';
 import useCatalog from '../hooks/useCatalog';
 import api, { errorMessage } from '../services/account-api';
 
@@ -14,7 +23,12 @@ const MAX_PRONOUNS = 10;
 const MAX_PRONOUN_LENGTH = 40;
 
 const normalise = (me) =>
-  JSON.stringify([[...me.genders].sort(), me.pronouns, me.about.trim()]);
+  JSON.stringify([
+    [...me.genders].sort(),
+    me.pronouns,
+    me.about.trim(),
+    me.ruleChangeMinDays,
+  ]);
 
 /**
  * The optional "Me" tab: who someone is, in their own words. Everything is
@@ -139,6 +153,29 @@ export default function MeSection({ onDirty }) {
             onChange={(e) => setMe({ ...me, about: e.target.value })}
             placeholder='In your own words'
           />
+        </div>
+
+        <div>
+          <Typography.Text strong>Rule change minimum</Typography.Text>
+          <Typography.Paragraph type='secondary' style={{ margin: 0 }}>
+            When someone sets rules for the two of you, each rule stays as it is
+            for at least this many days before it can be changed. They can ask
+            for longer, never shorter. It only matters when you&rsquo;re the one
+            living under someone&rsquo;s rules.
+          </Typography.Paragraph>
+          <Space style={{ marginTop: 4 }}>
+            <InputNumber
+              min={0}
+              max={365}
+              precision={0}
+              aria-label='Rule change minimum (days)'
+              value={me.ruleChangeMinDays}
+              onChange={(value) =>
+                setMe({ ...me, ruleChangeMinDays: value ?? 0 })
+              }
+            />
+            <Typography.Text>days</Typography.Text>
+          </Space>
         </div>
 
         <Button type='primary' loading={saving} onClick={save}>

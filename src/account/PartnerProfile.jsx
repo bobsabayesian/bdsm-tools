@@ -151,36 +151,45 @@ export default function PartnerProfile({ dynamic }) {
     {
       key: 'me',
       label: 'Me',
-      children:
-        myGenders.length === 0 && me.pronouns.length === 0 && !me.about ? (
-          <Nothing>{partner.alias} hasn&rsquo;t shared anything here.</Nothing>
-        ) : (
-          <Space orientation='vertical' size='small'>
-            {myGenders.length > 0 && (
-              <div>
-                <Typography.Text type='secondary'>Gender: </Typography.Text>
-                {myGenders.map((g) => (
-                  <Tag key={g.value}>{g.label}</Tag>
-                ))}
-              </div>
-            )}
-            {me.pronouns.length > 0 && (
-              <div>
-                <Typography.Text type='secondary'>Pronouns: </Typography.Text>
-                {me.pronouns.map((p) => (
-                  <Tag key={p}>{p}</Tag>
-                ))}
-              </div>
-            )}
-            {me.about && (
-              <Typography.Paragraph
-                style={{ whiteSpace: 'pre-wrap', margin: 0 }}
-              >
-                {me.about}
-              </Typography.Paragraph>
-            )}
-          </Space>
-        ),
+      children: (
+        <Space orientation='vertical' size='small'>
+          {myGenders.length > 0 && (
+            <div>
+              <Typography.Text type='secondary'>Gender: </Typography.Text>
+              {myGenders.map((g) => (
+                <Tag key={g.value}>{g.label}</Tag>
+              ))}
+            </div>
+          )}
+          {me.pronouns.length > 0 && (
+            <div>
+              <Typography.Text type='secondary'>Pronouns: </Typography.Text>
+              {me.pronouns.map((p) => (
+                <Tag key={p}>{p}</Tag>
+              ))}
+            </div>
+          )}
+          {me.about && (
+            <Typography.Paragraph style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
+              {me.about}
+            </Typography.Paragraph>
+          )}
+          {myGenders.length === 0 && me.pronouns.length === 0 && !me.about && (
+            <Nothing>
+              {partner.alias} hasn&rsquo;t shared anything else here.
+            </Nothing>
+          )}
+          <div>
+            <Typography.Text type='secondary'>
+              Rule change minimum:{' '}
+            </Typography.Text>
+            <Tag>
+              {me.ruleChangeMinDays}{' '}
+              {me.ruleChangeMinDays === 1 ? 'day' : 'days'}
+            </Tag>
+          </div>
+        </Space>
+      ),
     },
     {
       key: 'body',

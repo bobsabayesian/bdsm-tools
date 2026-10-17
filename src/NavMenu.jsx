@@ -12,6 +12,7 @@ import {
   TeamOutlined,
   EditOutlined,
   CheckSquareOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
 import { isMobile } from 'react-device-detect';
 
@@ -37,6 +38,12 @@ export default function NavMenu({ vertical = false }) {
             title: 'Tasks',
             label: <Link to='/tasks'>Tasks</Link>,
             icon: <CheckSquareOutlined />,
+          },
+          {
+            key: 'rules',
+            title: 'Rules',
+            label: <Link to='/rules'>Rules</Link>,
+            icon: <FileTextOutlined />,
           },
           {
             key: 'tools',

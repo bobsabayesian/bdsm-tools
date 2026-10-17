@@ -92,11 +92,6 @@ database, as sign-ups are rate limited per IP):
 $ BASE=http://localhost:8787 node scripts/smoke-accounts.mjs
 ```
 
-For local testing, `npm run seed:users` (with `npm run dev:api` running) creates the accounts
-`dom-test`, `sub-test` and `switch-test` (password `test-password-123`), with the first two
-already in a dynamic together. It refuses to run against anything but localhost. Use separate
-private/incognito windows to be logged in as two people at once.
-
 ### About me
 
 A person's profile lives at **About me** (`/account/about`, linked as "My profile" in the header), with
@@ -146,11 +141,10 @@ kinks, hard and soft limits included (`GET /api/dynamics/:id/profile`, shown on 
 - Answers given before this was explained (`users.profile_shared_at` is empty) stay hidden until the
   person confirms or saves again, so nothing is exposed retroactively.
 
-### Tasks and rules
+### Tasks
 
-The **Tasks** page (left menu, `/tasks`) is one view with a selector at the top right for which dynamic
-you are looking at, and two sections: **Tasks** and **Rules**. What you can do depends on who has
-control in that dynamic: the dominant in a pair, or you in solo mode.
+The **Tasks** page (left menu, `/tasks`) has a selector at the top right for which dynamic you are looking
+at. What you can do depends on who has control in that dynamic: the dominant in a pair, or you in solo mode.
 
 - **Assigning** (control only): pick from the task library - each task shows whether it is possible for
   this person and why not (a body part or equipment they haven't included, a hard limit, a proof type
@@ -164,11 +158,31 @@ control in that dynamic: the dominant in a pair, or you in solo mode.
   it). Photo/video/audio and location proofs need file storage and location consent and are not
   available yet. If the dom asked to review, the task waits for approval or is sent back with a note.
   Not completing a task is just a record ("not done") - nothing is penalised automatically.
-- **Rules** are set by whoever has control. The other person can **comment** but there is nothing to
-  approve. In a pair, making, changing or bringing back a rule asks "Have you discussed this with your
-  partner?" (Yes/Cancel) and records the answer where both can see it. Retiring a rule needs no question.
-- Either person can comment on any rule or task. Everything here is visible only to the two people, and
-  disappears from view once a dynamic ends; while paused it can be read but not changed.
+- Either person can comment on a task. Tasks are visible only to the two people, and disappear from view
+  once a dynamic ends; while paused they can be read but not changed.
+
+### Rules
+
+**Rules** (`/rules`, its own page with the same dynamic selector) belong to the dynamic as a whole and have
+nothing to do with any particular task. Whoever has control sets them; the other person can **comment** but
+there is nothing to approve. In a pair, making, changing or bringing back a rule asks "Have you discussed
+this with your partner?" (Yes/Cancel) and records the answer where both can see it.
+
+- **A rule stands for a while.** When setting a rule the dom says how many days until it can be changed. The
+  person living under the rules has a **rule change minimum** in their profile (About me > Me; default 7
+  days, 0-365), and the **longer of the two applies** - asking for 4 days against a minimum of 7 gives 7.
+  Until the time is up the rule cannot be changed **or retired**; a change starts a fresh lock. The lock is
+  worked out when the rule is set and keeps that value even if the minimum changes later (`worker/rules.js`).
+  Solo mode has no minimum; you choose your own lock.
+- Retiring a rule needs no question; bringing one back asks again and starts a new lock.
 
 Checks: `ADMIN_TOKEN=... BASE=http://localhost:8787 node scripts/smoke-tasks.mjs` against a fresh local
 database (as for `scripts/smoke-accounts.mjs`).
+
+### A local playground
+
+With `npm run dev:api` running, `npm run seed:users` creates `dom-test`, `sub-test` and `switch-test`
+(password `test-password-123`) with profiles filled in, puts the first two in a dynamic together
+("Sir" and "kitten"), and - using the `ADMIN_TOKEN` in `.env` - adds a few kinks and ten demo tasks
+(including a hard limit and a soft limit for `sub-test`, so both can be seen). Safe to repeat; it refuses to
+run against anything but localhost. Use separate private windows to be two people at once.

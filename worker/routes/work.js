@@ -3,6 +3,7 @@ import { noStore, requireJson, requireUser } from '../accounts';
 import { catalogs, validate } from '../catalogs';
 import { assessAssignment } from '../limits';
 import { overLimit } from '../ratelimit';
+import { isLocked, lockFor, MAX_DAYS, wholeDays } from '../rules';
 import {
   availability,
   checkResponse,
@@ -484,10 +485,16 @@ dynamicWork.post(
 );
 
 // ---- Rules ---------------------------------------------------------------
-// Whoever has control sets the rules; the other person can comment on them but
-// there is nothing for them to approve. In a pair, making or changing a rule
-// needs the setter to attest they have discussed it - checked here, not only by
-// the button.
+// Rules belong to the dynamic as a whole and have nothing to do with any
+// particular task. Whoever has control sets them; the other person can comment
+// but there is nothing for them to approve. In a pair, making, changing or
+// bringing back a rule needs the setter to attest they have discussed it -
+// checked here, not only by the button.
+//
+// Each rule is locked for a number of days: the setter says how many, the
+// person living under the rules has a minimum in their profile (default 7), and
+// the longer applies. Until the time is up the rule cannot be changed or
+// retired (see ../rules.js).
 
 const needsAttestation = (m, input) =>
   m.kind === 'pair' && input.attested !== true
@@ -512,7 +519,30 @@ const checkRule = (input, { partial = false } = {}) => {
   return { rule: out };
 };
 
-const presentRule = (row, m, counts) => ({
+/** The least number of days a rule must stand: the other person's minimum (none when alone) */
+const minimumDays = async (c, m) => {
+  if (m.kind === 'solo') return 0;
+  const row = await c.env.DB.prepare(
+    'SELECT rule_change_min_days FROM users WHERE id = ?',
+  )
+    .bind(m.assignee.user_id)
+    .first();
+  return row.rule_change_min_days;
+};
+
+/** { lock } for a new or changed rule, or { error } */
+const readLock = async (c, m, input) => {
+  const requested = wholeDays(input.lockDays);
+  if (requested === null) {
+    return {
+      error: `Say how many days (0 to ${MAX_DAYS}) until this can be changed`,
+    };
+  }
+  const { applied, lockedUntil } = lockFor(requested, await minimumDays(c, m));
+  return { lock: { requested, applied, lockedUntil } };
+};
+
+const presentRule = (row, counts) => ({
   id: row.id,
   title: row.title,
   body: row.body,
@@ -520,6 +550,10 @@ const presentRule = (row, m, counts) => ({
   createdAt: row.created_at,
   updatedAt: row.updated_at,
   attestedAt: row.attested_at,
+  lockDaysRequested: row.lock_days_requested,
+  lockDaysApplied: row.lock_days_applied,
+  lockedUntil: row.locked_until,
+  locked: isLocked(row.locked_until),
   comments: counts.get(`rule:${row.id}`) ?? 0,
 });
 
@@ -527,7 +561,7 @@ dynamicWork.get('/:id/rules', async (c) => {
   const { m, res } = await guard(c);
   if (res) return res;
   const db = c.env.DB;
-  const [{ results }, counts] = await Promise.all([
+  const [{ results }, counts, minDays] = await Promise.all([
     db
       .prepare(
         'SELECT * FROM dynamic_rules WHERE dynamic_id = ? ORDER BY created_at',
@@ -535,10 +569,12 @@ dynamicWork.get('/:id/rules', async (c) => {
       .bind(m.id)
       .all(),
     commentCounts(db, m.id),
+    minimumDays(c, m),
   ]);
   return c.json({
     you: youOf(m),
-    rules: results.map((row) => presentRule(row, m, counts)),
+    minDays,
+    rules: results.map((row) => presentRule(row, counts)),
   });
 });
 
@@ -552,12 +588,15 @@ dynamicWork.post('/:id/rules', async (c) => {
   if (missing) return c.json(missing, 400);
   const { rule, error } = checkRule(input);
   if (error) return c.json({ error }, 400);
+  const { lock, error: lockError } = await readLock(c, m, input);
+  if (lockError) return c.json({ error: lockError }, 400);
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   await c.env.DB.prepare(
-    `INSERT INTO dynamic_rules (id, dynamic_id, title, body, status, created_by, created_at, updated_at, attested_at)
-     VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?)`,
+    `INSERT INTO dynamic_rules (id, dynamic_id, title, body, status, created_by, created_at, updated_at,
+       attested_at, locked_until, lock_days_requested, lock_days_applied)
+     VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -568,12 +607,15 @@ dynamicWork.post('/:id/rules', async (c) => {
       now,
       now,
       m.kind === 'pair' ? now : null,
+      lock.lockedUntil,
+      lock.requested,
+      lock.applied,
     )
     .run();
   const row = await c.env.DB.prepare('SELECT * FROM dynamic_rules WHERE id = ?')
     .bind(id)
     .first();
-  return c.json(presentRule(row, m, new Map()), 201);
+  return c.json(presentRule(row, new Map()), 201);
 });
 
 const findRule = (c, m) =>
@@ -583,7 +625,76 @@ const findRule = (c, m) =>
     .bind(c.req.param('rid'), m.id)
     .first();
 
+const stillLocked = (c, row) =>
+  c.json(
+    {
+      error: 'This rule cannot be changed yet',
+      code: 'rule-locked',
+      lockedUntil: row.locked_until,
+    },
+    409,
+  );
+
 dynamicWork.put('/:id/rules/:rid', async (c) => {
+  const { m, res } = await guard(c, { write: true });
+  if (res) return res;
+  if (!m.canAssign)
+    return forbid(c, 'Only the person with control can change rules');
+  const row = await findRule(c, m);
+  if (!row) return c.json({ error: 'Not found' }, 404);
+  if (isLocked(row.locked_until)) return stillLocked(c, row);
+  const input = await body(c);
+  const missing = needsAttestation(m, input);
+  if (missing) return c.json(missing, 400);
+  const { rule, error } = checkRule(input, { partial: true });
+  if (error) return c.json({ error }, 400);
+  // A change starts a fresh lock
+  const { lock, error: lockError } = await readLock(c, m, input);
+  if (lockError) return c.json({ error: lockError }, 400);
+
+  const now = new Date().toISOString();
+  await c.env.DB.prepare(
+    `UPDATE dynamic_rules SET title = ?, body = ?, updated_at = ?, attested_at = ?,
+       locked_until = ?, lock_days_requested = ?, lock_days_applied = ? WHERE id = ?`,
+  )
+    .bind(
+      rule.title ?? row.title,
+      rule.body ?? row.body,
+      now,
+      m.kind === 'pair' ? now : null,
+      lock.lockedUntil,
+      lock.requested,
+      lock.applied,
+      row.id,
+    )
+    .run();
+  const updated = await c.env.DB.prepare(
+    'SELECT * FROM dynamic_rules WHERE id = ?',
+  )
+    .bind(row.id)
+    .first();
+  return c.json(presentRule(updated, await commentCounts(c.env.DB, m.id)));
+});
+
+// Retiring is a change, so it waits for the lock too. It needs no attestation.
+dynamicWork.post('/:id/rules/:rid/retire', async (c) => {
+  const { m, res } = await guard(c, { write: true });
+  if (res) return res;
+  if (!m.canAssign)
+    return forbid(c, 'Only the person with control can change rules');
+  const row = await findRule(c, m);
+  if (!row) return c.json({ error: 'Not found' }, 404);
+  if (isLocked(row.locked_until)) return stillLocked(c, row);
+  await c.env.DB.prepare(
+    `UPDATE dynamic_rules SET status = 'retired', updated_at = ? WHERE id = ?`,
+  )
+    .bind(new Date().toISOString(), row.id)
+    .run();
+  return c.body(null, 204);
+});
+
+// Bringing a rule back sets it again: it needs the attestation and a fresh lock
+dynamicWork.post('/:id/rules/:rid/restore', async (c) => {
   const { m, res } = await guard(c, { write: true });
   if (res) return res;
   if (!m.canAssign)
@@ -593,60 +704,22 @@ dynamicWork.put('/:id/rules/:rid', async (c) => {
   const input = await body(c);
   const missing = needsAttestation(m, input);
   if (missing) return c.json(missing, 400);
-  const { rule, error } = checkRule(input, { partial: true });
-  if (error) return c.json({ error }, 400);
+  const { lock, error: lockError } = await readLock(c, m, input);
+  if (lockError) return c.json({ error: lockError }, 400);
 
   const now = new Date().toISOString();
   await c.env.DB.prepare(
-    'UPDATE dynamic_rules SET title = ?, body = ?, updated_at = ?, attested_at = ? WHERE id = ?',
+    `UPDATE dynamic_rules SET status = 'active', updated_at = ?, attested_at = ?,
+       locked_until = ?, lock_days_requested = ?, lock_days_applied = ? WHERE id = ?`,
   )
     .bind(
-      rule.title ?? row.title,
-      rule.body ?? row.body,
       now,
       m.kind === 'pair' ? now : null,
+      lock.lockedUntil,
+      lock.requested,
+      lock.applied,
       row.id,
     )
-    .run();
-  const updated = await c.env.DB.prepare(
-    'SELECT * FROM dynamic_rules WHERE id = ?',
-  )
-    .bind(row.id)
-    .first();
-  return c.json(presentRule(updated, m, await commentCounts(c.env.DB, m.id)));
-});
-
-// Retiring a rule needs no attestation; bringing one back does, like making it
-dynamicWork.post('/:id/rules/:rid/retire', async (c) => {
-  const { m, res } = await guard(c, { write: true });
-  if (res) return res;
-  if (!m.canAssign)
-    return forbid(c, 'Only the person with control can change rules');
-  const row = await findRule(c, m);
-  if (!row) return c.json({ error: 'Not found' }, 404);
-  await c.env.DB.prepare(
-    `UPDATE dynamic_rules SET status = 'retired', updated_at = ? WHERE id = ?`,
-  )
-    .bind(new Date().toISOString(), row.id)
-    .run();
-  return c.body(null, 204);
-});
-
-dynamicWork.post('/:id/rules/:rid/restore', async (c) => {
-  const { m, res } = await guard(c, { write: true });
-  if (res) return res;
-  if (!m.canAssign)
-    return forbid(c, 'Only the person with control can change rules');
-  const row = await findRule(c, m);
-  if (!row) return c.json({ error: 'Not found' }, 404);
-  const missing = needsAttestation(m, await body(c));
-  if (missing) return c.json(missing, 400);
-
-  const now = new Date().toISOString();
-  await c.env.DB.prepare(
-    `UPDATE dynamic_rules SET status = 'active', updated_at = ?, attested_at = ? WHERE id = ?`,
-  )
-    .bind(now, m.kind === 'pair' ? now : null, row.id)
     .run();
   return c.body(null, 204);
 });
