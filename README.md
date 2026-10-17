@@ -73,6 +73,21 @@ the UI and kept in session storage.
 
 Catalogs are defined in `worker/catalogs.js` - adding an entry there adds it to the API and UI.
 
+The admin tool also has three screens of its own:
+
+- **Messages** - conversations started from the contact form. Each sender gets a private link
+  (`/contact/<token>`, no account needed) where they read your replies and answer; you reply here.
+- **Accounts** - search a username to see what you need to check someone is who they say they are
+  (display name, joined, last active, their dynamics and partners), and make a one-hour **reset code**
+  for them. A reset code is only made after you have checked their details and had their partner
+  confirm (the partner writes from their own logged-in account, ticking "include my username").
+- **Sign-ups & codes** - who can sign up (**invite only**, **open** or **closed**) and the single-use
+  invite codes you hand out. A new install starts **invite only**: nobody can sign up until you make a
+  code here (or switch to Open). Codes and reset codes are shown once and stored only as hashes.
+
+On a local database, switch sign-ups to Open (or run `npm run seed:users`, which does it) to create
+accounts without codes.
+
 ## Accounts and dynamics
 
 People sign up with a username and password (no email). The recovery code shown once at sign-up

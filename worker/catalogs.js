@@ -332,6 +332,8 @@ const catalogs = {
     collection: 'contact-messages',
     keyed: false,
     newestFirst: true,
+    // managed in the admin tool's own Messages screen (it holds the conversation)
+    hidden: true,
     titleField: 'message',
     fields: [
       {
@@ -549,11 +551,13 @@ const catalogs = {
 /** What the UI is allowed to see (no server-only details). */
 const describe = () =>
   Object.fromEntries(
-    Object.entries(catalogs).map(([id, catalog]) => {
-      const publicCatalog = { ...catalog };
-      delete publicCatalog.collection;
-      return [id, publicCatalog];
-    }),
+    Object.entries(catalogs)
+      .filter(([, catalog]) => !catalog.hidden)
+      .map(([id, catalog]) => {
+        const publicCatalog = { ...catalog };
+        delete publicCatalog.collection;
+        return [id, publicCatalog];
+      }),
   );
 
 /**

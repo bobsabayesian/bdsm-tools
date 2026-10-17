@@ -38,6 +38,17 @@ const admin = (path, data) =>
   }).then((res) => res.status); // 409 just means it is already there
 
 // ---- accounts
+// Sign-ups are invite only by default; this is a local test database, so open them
+if (ADMIN) {
+  await fetch(`${BASE}/api/admin/access/mode`, {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${ADMIN}`,
+    },
+    body: JSON.stringify({ mode: 'open' }),
+  });
+}
 const sessions = {};
 for (const username of USERS) {
   let result = await call('', 'POST', '/account/login', {

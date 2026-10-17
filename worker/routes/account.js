@@ -14,6 +14,13 @@ import {
   sha256Hex,
   verifyPassword,
 } from '../passwords';
+import {
+  claimInvite,
+  claimResetCode,
+  getSignupMode,
+  logAccountEvent,
+  releaseInvite,
+} from '../access';
 import { clientIp, overLimit, tidyRateLimits } from '../ratelimit';
 
 const MINUTE = 60 * 1000;
@@ -52,9 +59,18 @@ account.get('/me', async (c) => {
   return user ? c.json({ username: user.username }) : c.json(null);
 });
 
+// The sign-up form asks for an invite code only when one is needed
+account.get('/signup-info', async (c) =>
+  c.json({ mode: await getSignupMode(c.env.DB) }),
+);
+
 account.post('/signup', async (c) => {
   const db = c.env.DB;
-  const { username, password } = await body(c);
+  const { username, password, inviteCode } = await body(c);
+  const mode = await getSignupMode(db);
+  if (mode === 'closed') {
+    return c.json({ error: 'Sign-ups are closed right now' }, 403);
+  }
 
   if (typeof username !== 'string' || !USERNAME.test(username)) {
     return c.json(
@@ -67,13 +83,44 @@ account.post('/signup', async (c) => {
   }
   if (!checkPassword(password)) return c.json({ error: PASSWORD_RULE }, 400);
 
-  if (await overLimit(db, `signup:${clientIp(c)}`, 10, 60 * MINUTE)) {
+  // Open sign-ups are throttled hard. With invite codes every sign-up is
+  // someone the owner let in, so a shared connection can bring several friends.
+  if (
+    await overLimit(
+      db,
+      `signup:${mode}:${clientIp(c)}`,
+      mode === 'invite' ? 30 : 10,
+      60 * MINUTE,
+    )
+  ) {
     return c.json({ error: 'Too many sign-ups. Please try again later.' }, 429);
   }
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const recovery = await newRecoveryCode();
+
+  // Invite only: the code is used up by this sign-up, and only this one
+  let usedInvite = null;
+  if (mode === 'invite') {
+    if (
+      typeof inviteCode !== 'string' ||
+      (await overLimit(db, `invite:${clientIp(c)}`, 20, 60 * MINUTE))
+    ) {
+      return c.json(
+        { error: 'An invite code is needed to sign up' },
+        typeof inviteCode === 'string' ? 429 : 403,
+      );
+    }
+    if (!(await claimInvite(db, inviteCode, id))) {
+      return c.json(
+        { error: 'That invite code is not valid, or has already been used' },
+        403,
+      );
+    }
+    usedInvite = inviteCode;
+  }
+
   try {
     await db
       .prepare(
@@ -83,6 +130,8 @@ account.post('/signup', async (c) => {
       .bind(id, username, await hashPassword(password), recovery.hash, now, now)
       .run();
   } catch (e) {
+    // the sign-up did not happen, so the invite is still good
+    if (usedInvite) await releaseInvite(db, usedInvite);
     if (/UNIQUE constraint failed/.test(e?.message)) {
       return c.json({ error: 'That username is taken' }, 409);
     }
@@ -135,7 +184,8 @@ account.post('/logout', async (c) => {
   return c.body(null, 204);
 });
 
-// Forgotten password: needs the recovery code shown at sign-up
+// Forgotten password: needs the recovery code shown at sign-up, or a one-hour
+// reset code the site owner made after checking it is really them
 account.post('/recover', async (c) => {
   const db = c.env.DB;
   const { username, recoveryCode, newPassword } = await body(c);
@@ -156,11 +206,15 @@ account.post('/recover', async (c) => {
     )
     .bind(username)
     .first();
-  const matches =
+  const recoveryMatches =
     user &&
     user.recovery_hash === (await sha256Hex(normalizeCode(recoveryCode)));
-  if (!matches)
-    return c.json({ error: 'Incorrect username or recovery code' }, 401);
+  const viaOwner =
+    !recoveryMatches &&
+    user &&
+    (await claimResetCode(db, user.id, recoveryCode));
+  if (!recoveryMatches && !viaOwner)
+    return c.json({ error: 'Incorrect username or code' }, 401);
 
   // Each recovery code works once; issue a new one and log out everywhere
   const recovery = await newRecoveryCode();
@@ -171,6 +225,12 @@ account.post('/recover', async (c) => {
       )
       .bind(await hashPassword(newPassword), recovery.hash, user.id),
     db.prepare('DELETE FROM auth_sessions WHERE user_id = ?').bind(user.id),
+    logAccountEvent(
+      db,
+      user.id,
+      'password-reset',
+      viaOwner ? 'reset code from the site owner' : 'recovery code',
+    ),
   ]);
   await startSession(c, user.id);
   return c.json({ username, recoveryCode: recovery.code });

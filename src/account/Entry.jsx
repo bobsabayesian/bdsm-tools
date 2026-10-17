@@ -68,6 +68,15 @@ const Username = () => (
 );
 
 function AuthForms({ onAuthenticated, defaultTab }) {
+  // Whether sign-up needs an invite code (or is closed) is the owner's choice
+  const [mode, setMode] = React.useState('invite');
+  React.useEffect(() => {
+    api
+      .signupInfo()
+      .then(({ mode: current }) => setMode(current))
+      .catch(() => {});
+  }, []);
+
   return (
     <Tabs
       defaultActiveKey={defaultTab}
@@ -103,9 +112,9 @@ function AuthForms({ onAuthenticated, defaultTab }) {
             <AuthForm
               name='signup'
               button='Create account'
-              action={({ username, password }) =>
+              action={({ username, password, inviteCode }) =>
                 api
-                  .signup(username, password)
+                  .signup(username, password, inviteCode)
                   .then(({ recoveryCode }) =>
                     onAuthenticated(username, recoveryCode, '/account/setup'),
                   )
@@ -116,6 +125,26 @@ function AuthForms({ onAuthenticated, defaultTab }) {
                 a dynamic with never see it, only the name you choose for each
                 one.
               </Typography.Paragraph>
+              {mode === 'closed' && (
+                <Alert
+                  type='info'
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                  title='Sign-ups are closed right now.'
+                />
+              )}
+              {mode === 'invite' && (
+                <Form.Item
+                  label='Invite code'
+                  name='inviteCode'
+                  extra='This site is invite only. Ask whoever sent you here for a code.'
+                  rules={[
+                    { required: true, message: 'Enter your invite code' },
+                  ]}
+                >
+                  <Input autoComplete='off' spellCheck={false} />
+                </Form.Item>
+              )}
               <Form.Item
                 label='Username'
                 name='username'
@@ -154,11 +183,13 @@ function AuthForms({ onAuthenticated, defaultTab }) {
             >
               <Typography.Paragraph type='secondary'>
                 Use the recovery code you were shown when you created your
-                account.
+                account. If you have lost it, message the site owner from About,
+                then Contact Us; once they have checked it is you, they will
+                send a one-time reset code to use here instead.
               </Typography.Paragraph>
               <Username />
               <Form.Item
-                label='Recovery code'
+                label='Recovery code, or reset code from the site owner'
                 name='recoveryCode'
                 rules={[
                   { required: true, message: 'Enter your recovery code' },

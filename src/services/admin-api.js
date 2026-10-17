@@ -42,4 +42,40 @@ const updateItem = (catalog, id, item) =>
 const deleteItem = (catalog, id) =>
   request('delete', `/catalogs/${catalog}/items/${id}`);
 
-export default { getCatalogs, listItems, createItem, updateItem, deleteItem };
+// Messages from the contact form, with the conversation in each
+const messages = () => request('get', '/messages');
+const replyToMessage = (id, body) =>
+  request('post', `/messages/${id}/reply`, { body });
+const setMessageStatus = (id, status) =>
+  request('put', `/messages/${id}`, { status });
+const deleteMessage = (id) => request('delete', `/messages/${id}`);
+
+// Who may sign up, and the invite codes
+const access = () => request('get', '/access');
+const setSignupMode = (mode) => request('put', '/access/mode', { mode });
+const createInvite = (note, days) =>
+  request('post', '/invites', { note, days });
+const deleteInvite = (id) => request('delete', `/invites/${id}`);
+
+// Checking someone is who they say they are, and letting them back in
+const findUsers = (q) => request('get', `/users?q=${encodeURIComponent(q)}`);
+const createResetCode = (id, note) =>
+  request('post', `/users/${id}/reset-code`, { note });
+
+export default {
+  getCatalogs,
+  listItems,
+  createItem,
+  updateItem,
+  deleteItem,
+  messages,
+  replyToMessage,
+  setMessageStatus,
+  deleteMessage,
+  access,
+  setSignupMode,
+  createInvite,
+  deleteInvite,
+  findUsers,
+  createResetCode,
+};

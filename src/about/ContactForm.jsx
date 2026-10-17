@@ -1,5 +1,14 @@
 import React from 'react';
-import { Alert, Button, Checkbox, Form, Input, Select } from 'antd';
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Form,
+  Input,
+  Select,
+  Space,
+  Typography,
+} from 'antd';
 import api, { errorMessage } from '../services/contact-api';
 import useAccount from '../state/useAccount';
 
@@ -17,26 +26,40 @@ export default function ContactForm() {
   const { user } = useAccount();
   const [form] = Form.useForm();
   const [sending, setSending] = React.useState(false);
-  const [sent, setSent] = React.useState(false);
+  const [sent, setSent] = React.useState(null); // { token } once it has gone
   const [error, setError] = React.useState(null);
 
   if (sent) {
+    const link = `${window.location.origin}/contact/${sent.token}`;
     return (
       <Alert
         type='success'
         showIcon
         title='Thanks, your message is in.'
-        description='If you left a way to reply, that is where the answer will go.'
-        action={
-          <Button
-            size='small'
-            onClick={() => {
-              form.resetFields();
-              setSent(false);
-            }}
-          >
-            Send another
-          </Button>
+        description={
+          <>
+            <Typography.Paragraph style={{ marginBottom: 8 }}>
+              Replies appear at this private link. Save it: there is no email,
+              and anyone with the link can read and answer this conversation.
+            </Typography.Paragraph>
+            <Typography.Paragraph copyable code style={{ marginBottom: 8 }}>
+              {link}
+            </Typography.Paragraph>
+            <Space>
+              <Button type='primary' size='small' href={link}>
+                Open the conversation
+              </Button>
+              <Button
+                size='small'
+                onClick={() => {
+                  form.resetFields();
+                  setSent(null);
+                }}
+              >
+                Send another
+              </Button>
+            </Space>
+          </>
         }
       />
     );
@@ -53,7 +76,7 @@ export default function ContactForm() {
         setError(null);
         api
           .send(values)
-          .then(() => setSent(true))
+          .then((result) => setSent(result))
           .catch((e) => setError(errorMessage(e)))
           .finally(() => setSending(false));
       }}
@@ -87,7 +110,7 @@ export default function ContactForm() {
       <Form.Item
         label='Reply to (optional)'
         name='replyTo'
-        extra='An email address, or anything else you check. Leave it empty if you do not want a reply.'
+        extra='Optional. You will get your reply at a private link after you send this, so you can leave it empty. If you add an email or anything else you check, the owner may use it as well.'
         rules={[{ max: 200, message: 'At most 200 characters' }]}
       >
         <Input autoComplete='email' spellCheck={false} />

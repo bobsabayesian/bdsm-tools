@@ -145,9 +145,9 @@ export default function Entry() {
                 photos, video, audio, or a location.
               </li>
               <li>
-                Messages sent from the contact form below, and when you were
-                last active (your partner sees that, as a rough &ldquo;last
-                active&rdquo;).
+                Messages sent from the contact form below (each has a private
+                link for the conversation), and when you were last active (your
+                partner sees that, as a rough &ldquo;last active&rdquo;).
               </li>
             </ul>
             <Typography.Title level={5}>Who can see it</Typography.Title>

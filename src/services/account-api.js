@@ -7,8 +7,9 @@ export { errorMessage } from './errors';
 
 // Accounts
 const me = () => call('get', '/account/me');
-const signup = (username, password) =>
-  call('post', '/account/signup', { username, password });
+const signupInfo = () => call('get', '/account/signup-info');
+const signup = (username, password, inviteCode) =>
+  call('post', '/account/signup', { username, password, inviteCode });
 const login = (username, password) =>
   call('post', '/account/login', { username, password });
 const logout = () => call('post', '/account/logout');
@@ -47,6 +48,7 @@ const end = (id, details) => call('post', `/dynamics/${id}/end`, details);
 
 export default {
   me,
+  signupInfo,
   signup,
   login,
   logout,

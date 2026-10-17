@@ -52,6 +52,272 @@ const [a, b, c] = ['alice-account', 'bob-account', 'carol-account'].map(
   (n) => new Person(n),
 );
 
+const ADMIN = process.env.ADMIN_TOKEN;
+if (!ADMIN)
+  throw new Error('Set ADMIN_TOKEN (it makes invite codes and opens sign-ups)');
+const admin = async (method, path, data) => {
+  const res = await fetch(`${BASE}/api/admin${path}`, {
+    method,
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${ADMIN}`,
+    },
+    body: data === undefined ? undefined : JSON.stringify(data),
+  });
+  const text = await res.text();
+  return { status: res.status, json: text ? JSON.parse(text) : null };
+};
+const signupWith = (name, extra = {}) =>
+  new Person(name).call('POST', '/account/signup', {
+    username: name,
+    password: PASSWORD,
+    ...extra,
+  });
+
+step('sign-ups: invite only until the owner says otherwise');
+assert.equal(
+  (await admin('PUT', '/access/mode', { mode: 'invite' })).status,
+  200,
+);
+assert.equal(
+  (await new Person('x').call('GET', '/account/signup-info')).json.mode,
+  'invite',
+);
+assert.equal(
+  (await signupWith('nocode-user')).status,
+  403,
+  'no code, no account',
+);
+assert.equal(
+  (await signupWith('badcode-user', { inviteCode: 'AAAA-BBBB-CCCC-DDDD' }))
+    .status,
+  403,
+);
+const ownerInvite = (
+  await admin('POST', '/invites', { note: 'for Sam', days: 7 })
+).json;
+assert.match(ownerInvite.code, /^([A-Z2-9]{4}-){3}[A-Z2-9]{4}$/);
+assert.ok(ownerInvite.expiresAt);
+const accessList = (await admin('GET', '/access')).json;
+assert.equal(
+  accessList.invites.find((i) => i.id === ownerInvite.id).state,
+  'unused',
+);
+assert.ok(
+  !JSON.stringify(accessList).includes(ownerInvite.code),
+  'the code itself is never stored or listed',
+);
+assert.equal(
+  (
+    await signupWith('invited-user', {
+      inviteCode: ownerInvite.code.toLowerCase().replaceAll('-', ' '),
+    })
+  ).status,
+  201,
+  'case, spaces and dashes do not matter',
+);
+assert.equal(
+  (await signupWith('second-user', { inviteCode: ownerInvite.code })).status,
+  403,
+  'a code works once',
+);
+assert.equal(
+  (await admin('GET', '/access')).json.invites.find(
+    (i) => i.id === ownerInvite.id,
+  ).state,
+  'used',
+);
+const clashInvite = (
+  await admin('POST', '/invites', { note: 'username clash' })
+).json;
+assert.equal(
+  (await signupWith('invited-user', { inviteCode: clashInvite.code })).status,
+  409,
+);
+assert.equal(
+  (await signupWith('fresh-user', { inviteCode: clashInvite.code })).status,
+  201,
+  'a code is not used up by a sign-up that failed',
+);
+const spareInvite = (await admin('POST', '/invites', {})).json;
+assert.equal((await admin('DELETE', `/invites/${spareInvite.id}`)).status, 204);
+assert.equal(
+  (await signupWith('late-user', { inviteCode: spareInvite.code })).status,
+  403,
+  'a removed code is dead',
+);
+assert.equal(
+  (await admin('PUT', '/access/mode', { mode: 'nonsense' })).status,
+  400,
+);
+assert.equal(
+  (await admin('PUT', '/access/mode', { mode: 'closed' })).status,
+  200,
+);
+const whileClosed = (await admin('POST', '/invites', {})).json;
+assert.equal(
+  (await signupWith('closed-user', { inviteCode: whileClosed.code })).status,
+  403,
+  'closed means closed',
+);
+
+step('a password reset code, made by the owner after checking who it is');
+await admin('PUT', '/access/mode', { mode: 'open' });
+const lockedUser = new Person('locked-user');
+await lockedUser.signup();
+const foundUsers = (await admin('GET', '/users?q=locked-us')).json;
+assert.equal(foundUsers.length, 1);
+assert.equal(foundUsers[0].displayName, 'Locked');
+assert.deepEqual(
+  (await admin('GET', '/users?q=l')).json,
+  [],
+  'two letters at least',
+);
+const ownerResetCode = (
+  await admin('POST', `/users/${foundUsers[0].id}/reset-code`, {
+    note: 'partner confirmed',
+  })
+).json;
+assert.match(ownerResetCode.code, /^([A-Z2-9]{4}-){3}[A-Z2-9]{4}$/);
+const recoverWith = (code, newPassword = 'a brand new password') =>
+  new Person('x').call('POST', '/account/recover', {
+    username: lockedUser.name,
+    recoveryCode: code,
+    newPassword,
+  });
+assert.equal((await recoverWith('AAAA-BBBB-CCCC-DDDD')).status, 401);
+const recoveredRes = await recoverWith(ownerResetCode.code);
+assert.equal(recoveredRes.status, 200);
+assert.match(
+  recoveredRes.json.recoveryCode,
+  /^([A-Z2-9]{4}-){4}[A-Z2-9]{4}$/,
+  'and they get a fresh recovery code of their own',
+);
+assert.equal(
+  (
+    await lockedUser.call('POST', '/account/login', {
+      username: lockedUser.name,
+      password: 'a brand new password',
+    })
+  ).status,
+  200,
+);
+assert.equal(
+  (
+    await lockedUser.call('POST', '/account/login', {
+      username: lockedUser.name,
+      password: PASSWORD,
+    })
+  ).status,
+  401,
+  'the old password is gone',
+);
+assert.equal(
+  (await recoverWith(ownerResetCode.code, 'another password!!')).status,
+  401,
+  'a reset code works once',
+);
+const secondReset = (
+  await admin('POST', `/users/${foundUsers[0].id}/reset-code`, {})
+).json;
+const thirdReset = (
+  await admin('POST', `/users/${foundUsers[0].id}/reset-code`, {})
+).json;
+assert.equal(
+  (await recoverWith(secondReset.code, 'yet another one!!')).status,
+  401,
+  'only the newest code is good',
+);
+assert.equal(
+  (await recoverWith(thirdReset.code, 'yet another one!!')).status,
+  200,
+);
+const resetEvents = (await admin('GET', '/access')).json.events.filter(
+  (e) => e.username === lockedUser.name,
+);
+assert.ok(
+  resetEvents.some(
+    (e) => e.type === 'password-reset' && /site owner/.test(e.detail),
+  ),
+  'resets are on record',
+);
+assert.ok(resetEvents.some((e) => e.type === 'reset-code-issued'));
+assert.equal(
+  (await admin('POST', '/users/not-a-user/reset-code', {})).status,
+  404,
+);
+
+step('messages: a private link to talk back and forth');
+const askMsg = (extra = {}) => ({
+  topic: 'problem',
+  message: 'I am locked out of my account',
+  ...extra,
+});
+const askerUser = new Person('asker');
+const sentMsg = await askerUser.call(
+  'POST',
+  '/contact',
+  askMsg({ replyTo: 'asker@example.com' }),
+);
+assert.equal(sentMsg.status, 201);
+assert.ok(sentMsg.json.token.length > 30);
+const threadPath = `/contact/thread/${sentMsg.json.token}`;
+assert.equal((await askerUser.call('GET', threadPath)).json.thread.length, 1);
+assert.equal(
+  (await askerUser.call('GET', '/contact/thread/not-a-real-token')).status,
+  404,
+);
+let inboxList = (await admin('GET', '/messages')).json;
+const mineMsg = inboxList.find(
+  (m) => m.thread[0].body === 'I am locked out of my account',
+);
+assert.equal(mineMsg.waiting, true, 'waiting for an answer');
+assert.ok(
+  !JSON.stringify(inboxList).includes('tokenHash') &&
+    !JSON.stringify(inboxList).includes(sentMsg.json.token),
+);
+assert.equal(
+  (
+    await admin('POST', `/messages/${mineMsg.id}/reply`, {
+      body: 'What name do you use in your dynamic?',
+    })
+  ).status,
+  200,
+);
+const seenThread = (await askerUser.call('GET', threadPath)).json;
+assert.deepEqual(
+  seenThread.thread.map((t) => t.from),
+  ['them', 'admin'],
+  'they read the answer',
+);
+assert.equal(
+  (await askerUser.call('POST', threadPath, { body: 'I am kitten, with Sir' }))
+    .status,
+  201,
+);
+assert.equal(
+  (await askerUser.call('POST', threadPath, { body: '  ' })).status,
+  400,
+);
+inboxList = (await admin('GET', '/messages')).json;
+const againMsg = inboxList.find((m) => m.id === mineMsg.id);
+assert.equal(againMsg.thread.length, 3);
+assert.equal(againMsg.waiting, true, 'their reply is waiting for you');
+assert.equal(againMsg.status, 'new');
+assert.equal(
+  (await admin('PUT', `/messages/${mineMsg.id}`, { status: 'handled' })).status,
+  200,
+);
+assert.equal((await admin('DELETE', `/messages/${mineMsg.id}`)).status, 204);
+assert.equal(
+  (await askerUser.call('GET', threadPath)).status,
+  404,
+  'gone once deleted',
+);
+
+// from here on, everyone can sign up
+await admin('PUT', '/access/mode', { mode: 'open' });
+
 step('sign-up rules');
 const signupA = await a.signup();
 assert.equal(signupA.status, 201);
@@ -1142,29 +1408,26 @@ assert.equal(
   ).status,
   201,
 );
-if (process.env.ADMIN_TOKEN) {
-  const res = await fetch(`${BASE}/api/admin/catalogs/messages/items`, {
-    headers: { authorization: `Bearer ${process.env.ADMIN_TOKEN}` },
-  });
-  const items = await res.json();
+{
+  const items = (await admin('GET', '/messages')).json;
   assert.equal(items.length, 3, 'the bot message was not kept');
   assert.equal(
-    items[0].message,
+    items[0].thread[0].body,
     'Not logged in, but asking for a username',
     'newest first',
   );
   assert.equal(
     items[0].username,
-    undefined,
+    null,
     'no username unless logged in and asked',
   );
-  const mine = items.find((i) => i.message === 'Please remove my data');
+  const mine = items.find((i) => i.thread[0].body === 'Please remove my data');
   assert.equal(mine.username, writer.name);
   assert.equal(mine.replyTo, 'me@example.com');
   assert.equal(mine.status, 'new');
   assert.equal(mine.topic, 'data-request');
 }
-assert.equal((await visitor.call('POST', '/contact', msg())).status, 201);
+// (the asker above and these four made five in the hour)
 assert.equal(
   (await visitor.call('POST', '/contact', msg())).status,
   429,

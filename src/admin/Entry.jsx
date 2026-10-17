@@ -7,7 +7,17 @@ import api, {
   isUnauthorized,
   setToken,
 } from '../services/admin-api';
+import AccessPanel from './AccessPanel';
+import AccountsPanel from './AccountsPanel';
 import CatalogManager from './CatalogManager';
+import MessagesPanel from './MessagesPanel';
+
+// Screens of their own, ahead of the lists of things the site offers
+const SCREENS = {
+  messages: 'Messages',
+  accounts: 'Accounts',
+  access: 'Sign-ups & codes',
+};
 
 function Login({ onLogin, error }) {
   const [loading, setLoading] = React.useState(false);
@@ -43,6 +53,7 @@ export default function Entry() {
   const [loading, setLoading] = React.useState(!!getToken());
   const [error, setError] = React.useState(null);
   const [selected, setSelected] = React.useState(null);
+  const [lookup, setLookup] = React.useState('');
 
   const login = (token) =>
     api
@@ -51,7 +62,7 @@ export default function Entry() {
         setToken(token);
         setError(null);
         setCatalogs(result);
-        setSelected((current) => current ?? Object.keys(result)[0]);
+        setSelected((current) => current ?? 'messages');
       })
       .catch((e) => {
         setToken(null);
@@ -91,22 +102,52 @@ export default function Entry() {
             style={{ width: 240, flexShrink: 0 }}
             selectedKeys={[selected]}
             onClick={({ key }) => setSelected(key)}
-            items={Object.entries(catalogs).map(([id, { title }]) => ({
-              key: id,
-              label: title,
-            }))}
+            items={[
+              ...Object.entries(SCREENS).map(([key, label]) => ({
+                key,
+                label,
+              })),
+              { type: 'divider' },
+              ...Object.entries(catalogs).map(([id, { title }]) => ({
+                key: id,
+                label: title,
+              })),
+            ]}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             <Typography.Title level={4}>
-              {catalogs[selected].title}
+              {SCREENS[selected] ?? catalogs[selected]?.title}
             </Typography.Title>
-            <CatalogManager
-              key={selected}
-              id={selected}
-              catalog={catalogs[selected]}
-              catalogs={catalogs}
-              onUnauthorized={() => logout('Your session is no longer valid')}
-            />
+            {selected === 'messages' && (
+              <MessagesPanel
+                onUnauthorized={() => logout('Your session is no longer valid')}
+                onLookup={(username) => {
+                  setLookup(username);
+                  setSelected('accounts');
+                }}
+              />
+            )}
+            {selected === 'accounts' && (
+              <AccountsPanel
+                key={lookup}
+                initialQuery={lookup}
+                onUnauthorized={() => logout('Your session is no longer valid')}
+              />
+            )}
+            {selected === 'access' && (
+              <AccessPanel
+                onUnauthorized={() => logout('Your session is no longer valid')}
+              />
+            )}
+            {catalogs[selected] && (
+              <CatalogManager
+                key={selected}
+                id={selected}
+                catalog={catalogs[selected]}
+                catalogs={catalogs}
+                onUnauthorized={() => logout('Your session is no longer valid')}
+              />
+            )}
           </div>
         </div>
       )}

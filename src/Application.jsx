@@ -46,6 +46,9 @@ const RulesEntry = React.lazy(
   () => import(/* webpackChunkName: "Tasks" */ './tasks/Rules'),
 );
 
+const ThreadEntry = React.lazy(
+  () => import(/* webpackChunkName: "About" */ './about/Thread'),
+);
 const ToReviewEntry = React.lazy(
   () => import(/* webpackChunkName: "Tasks" */ './tasks/ToReview'),
 );
@@ -108,6 +111,7 @@ export default function Application() {
           <Route path='account/setup' element={<SetupEntry />} />
           <Route path='account/setup/:step' element={<SetupEntry />} />
           <Route path='account/dynamics/:id' element={<DynamicView />} />
+          <Route path='contact/:token' element={<ThreadEntry />} />
           <Route path='about/faq' element={<FaqEntry />} />
           <Route path='about/info' element={<AboutEntry />} />
           <Route path='tools' element={<FeatureFlagLayout />}>

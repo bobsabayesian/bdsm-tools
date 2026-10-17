@@ -70,6 +70,15 @@ const admin = async (path, data) => {
 };
 const step = (name) => console.log('•', name);
 
+// sign-ups are invite only by default; this is a test database, so open them
+await fetch(`${BASE}/api/admin/access/mode`, {
+  method: 'PUT',
+  headers: {
+    'content-type': 'application/json',
+    authorization: `Bearer ${ADMIN}`,
+  },
+  body: JSON.stringify({ mode: 'open' }),
+});
 const dom = await new Person('dom').signup('Zak');
 const sub = await new Person('sub').signup('Sara');
 const stranger = await new Person('stranger').signup('Sam');
