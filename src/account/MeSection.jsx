@@ -99,17 +99,11 @@ export default function MeSection({ onDirty }) {
 
   return (
     <>
-      <Typography.Title level={4}>Me</Typography.Title>
       <Space
         orientation='vertical'
         size='middle'
         style={{ maxWidth: 640, width: '100%' }}
       >
-        <Typography.Paragraph>
-          Whatever you&rsquo;d like the people you&rsquo;re in a dynamic with to
-          know about you. Everything here is optional, and nothing else depends
-          on it.
-        </Typography.Paragraph>
         <SaveActions canSave={canSave} saving={saving} onSave={save} />
         <Typography.Text type='secondary'>
           They can see this &mdash; nothing is hidden between you. You can

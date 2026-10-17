@@ -66,7 +66,7 @@ export default function AssignTaskModal({
   const [dueMode, setDueMode] = React.useState('none');
   const [dueDate, setDueDate] = React.useState('');
   const [dueTime, setDueTime] = React.useState('');
-  const [review, setReview] = React.useState(false);
+  const [review, setReview] = React.useState(true);
   const [limits, setLimits] = React.useState(null); // { mine, theirs } days of retention
   const [keepDays, setKeepDays] = React.useState(null); // null: the default
   const ownProof = Form.useWatch('proof', form);
@@ -82,6 +82,7 @@ export default function AssignTaskModal({
     setBlocked(null);
     setLibrary(null);
     setKeepDays(null);
+    setReview(true);
     api
       .retention(dynamicId)
       .then(setLimits)

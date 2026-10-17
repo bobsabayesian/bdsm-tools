@@ -22,6 +22,7 @@ import CommentsThread from './CommentsThread';
 import CompleteTaskModal from './CompleteTaskModal';
 import { PROOF_LABEL, requirement, ResponseSummary } from './proofs';
 import ReviewModal from './ReviewModal';
+import { Summary, windows } from './schedule';
 
 const STATUS = {
   pending: { color: 'blue', label: 'To do' },
@@ -169,7 +170,30 @@ function TaskCard({
   );
 }
 
-export default function TaskList({ dynamicId, paused }) {
+/** What the other person has coming due, in the same windows as My tasks */
+function ComingDue({ assignments, waiting, partner }) {
+  const w = windows(assignments);
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <Typography.Title level={5} style={{ marginTop: 0 }}>
+        Coming due{partner ? ` from ${partner}` : ''}
+      </Typography.Title>
+      <Space wrap align='stretch' style={{ width: '100%' }}>
+        {w.overdue.length > 0 && (
+          <Summary title='Overdue' tasks={w.overdue} color='#d71616' />
+        )}
+        <Summary title='Next 24 hours' tasks={w.next24} />
+        <Summary title='Next 48 hours' tasks={w.next48} />
+        <Summary title='Next week' tasks={w.nextWeek} />
+      </Space>
+      <Typography.Title level={5} style={{ marginTop: 24 }}>
+        Waiting for your review ({waiting})
+      </Typography.Title>
+    </div>
+  );
+}
+
+export default function TaskList({ dynamicId, paused, mode = 'all' }) {
   const { message } = App.useApp();
   const { items: kinks } = useCatalog('kinks');
   const [data, setData] = React.useState(null);
@@ -191,12 +215,15 @@ export default function TaskList({ dynamicId, paused }) {
 
   const { you, assignments, dynamic } = data;
   const solo = dynamic.kind === 'solo';
+  const reviewing_ = mode === 'review';
   const open = assignments.filter((a) =>
-    ['pending', 'submitted'].includes(a.status),
+    reviewing_
+      ? a.status === 'submitted'
+      : ['pending', 'submitted'].includes(a.status),
   );
-  const finished = assignments.filter(
-    (a) => !['pending', 'submitted'].includes(a.status),
-  );
+  const finished = reviewing_
+    ? []
+    : assignments.filter((a) => !['pending', 'submitted'].includes(a.status));
   // keep a modal pointed at the freshest copy (a timer's start, say)
   const fresh = (a) => assignments.find((x) => x.id === a?.id) ?? a;
 
@@ -222,7 +249,7 @@ export default function TaskList({ dynamicId, paused }) {
 
   return (
     <>
-      {you.canAssign && (
+      {you.canAssign && !reviewing_ && (
         <div style={{ marginBottom: 16 }}>
           <Button
             type='primary'
@@ -234,12 +261,22 @@ export default function TaskList({ dynamicId, paused }) {
         </div>
       )}
 
+      {reviewing_ && (
+        <ComingDue
+          assignments={assignments}
+          waiting={open.length}
+          partner={you.partner}
+        />
+      )}
+
       {open.length === 0 ? (
         <Empty
           description={
-            you.canAssign
-              ? 'Nothing assigned right now.'
-              : `Nothing to do right now.`
+            reviewing_
+              ? 'Nothing is waiting for your review.'
+              : you.canAssign
+                ? 'Nothing assigned right now.'
+                : `Nothing to do right now.`
           }
         />
       ) : (

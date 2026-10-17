@@ -19,8 +19,14 @@ export default function NavMenu({ vertical = false }) {
     <Affix offsetTop={0}>
       <Menu
         mode={vertical ? 'inline' : 'horizontal'}
-        selectedKeys={pathname === '/' ? '/' : pathname.split('/')}
-        defaultOpenKeys={[]}
+        selectedKeys={
+          pathname === '/'
+            ? '/'
+            : pathname === '/tasks'
+              ? ['tasks-all']
+              : pathname.split('/')
+        }
+        defaultOpenKeys={['tasks']}
         style={{ minWidth: 0, flex: 'auto' }}
         items={[
           {
@@ -32,8 +38,25 @@ export default function NavMenu({ vertical = false }) {
           {
             key: 'tasks',
             title: 'Tasks',
-            label: <Link to='/tasks'>Tasks</Link>,
+            label: 'Tasks',
             icon: <CheckSquareOutlined />,
+            children: [
+              {
+                key: 'tasks-all',
+                title: 'All tasks',
+                label: <Link to='/tasks'>All tasks</Link>,
+              },
+              {
+                key: 'review',
+                title: 'To review',
+                label: <Link to='/tasks/review'>To review</Link>,
+              },
+              {
+                key: 'mine',
+                title: 'My tasks',
+                label: <Link to='/tasks/mine'>My tasks</Link>,
+              },
+            ],
           },
           {
             key: 'rules',
