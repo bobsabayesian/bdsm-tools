@@ -8,7 +8,7 @@
     "db:migrate:local": "wrangler d1 migrations apply bdsm-tools --local",
     "db:migrate": "wrangler d1 migrations apply bdsm-tools --remote",
     "deploy": "npm run build && wrangler deploy",
-    "start": "webpack serve --config webpack-local.config.js --progress --bail",
+    "start": "node --disable-warning=DEP0060 node_modules/webpack-cli/bin/cli.js serve --config webpack-local.config.js --progress --bail",
     "build": "webpack --config webpack-prod.config.js --bail && npm run update-version",
     "test-build": "webpack --config webpack-dev.config.js --bail && npm run update-version",
     "test": "npm run lint && npm run test-compile && npm run test:worker",
