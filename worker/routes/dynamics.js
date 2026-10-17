@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { noStore, requireJson, requireUser } from '../accounts';
 import { normalizeCode, randomCode, sha256Hex } from '../passwords';
 import { overLimit } from '../ratelimit';
+import { readAbout } from './profile';
 
 /**
  * A "dynamic" is a relationship between two people (or one person alone, in
@@ -33,7 +34,7 @@ const cleanAlias = (alias, fallback) => {
 const placeholders = (items) => items.map(() => '?').join(',');
 
 /** Pauses with a "resume on" date lift themselves once the date arrives */
-const resumeDuePauses = async (db, userId) => {
+export const resumeDuePauses = async (db, userId) => {
   const now = new Date().toISOString();
   const { results } = await db
     .prepare(
@@ -327,18 +328,30 @@ dynamics.get('/:id/profile', async (c) => {
   if (!partner) return c.json({ error: 'Not found' }, 404);
   if (!partner.profile_shared_at) return c.json({ shared: false });
 
-  const { results } = await db
-    .prepare(
-      'SELECT catalog, key, direction, state FROM user_selections WHERE user_id = ?',
-    )
-    .bind(partner.id)
-    .all();
+  const [{ results }, aboutRow] = await Promise.all([
+    db
+      .prepare(
+        'SELECT catalog, key, direction, state FROM user_selections WHERE user_id = ?',
+      )
+      .bind(partner.id)
+      .all(),
+    db
+      .prepare(
+        'SELECT genders, pronouns, about FROM user_about WHERE user_id = ?',
+      )
+      .bind(partner.id)
+      .first(),
+  ]);
   return c.json({
     shared: true,
     steps: JSON.parse(partner.profile_steps),
+    me: readAbout(aboutRow),
     selections: {
       bodyParts: results
         .filter((row) => row.catalog === 'bodyParts')
+        .map(({ key }) => ({ key })),
+      equipment: results
+        .filter((row) => row.catalog === 'equipment')
         .map(({ key }) => ({ key })),
       kinks: results
         .filter((row) => row.catalog === 'kinks')

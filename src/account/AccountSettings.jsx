@@ -107,14 +107,6 @@ function DeleteAccount() {
 export default function AccountSettings() {
   const { user, setUser } = useAccount();
   const navigate = useNavigate();
-  const [steps, setSteps] = React.useState([]);
-
-  React.useEffect(() => {
-    api
-      .getProfile()
-      .then((profile) => setSteps(profile.steps.map((step) => step.id)))
-      .catch(() => {}); // the buttons are a nicety
-  }, []);
 
   return (
     <Collapse
@@ -129,18 +121,9 @@ export default function AccountSettings() {
               <Button onClick={() => api.logout().finally(() => setUser(null))}>
                 Log out
               </Button>
-              <Space wrap>
-                {steps.includes('bodyParts') && (
-                  <Button onClick={() => navigate('/account/setup/bodyParts')}>
-                    Change what is included in tasks
-                  </Button>
-                )}
-                {steps.includes('kinks') && (
-                  <Button onClick={() => navigate('/account/setup/kinks')}>
-                    Change my kink choices and limits
-                  </Button>
-                )}
-              </Space>
+              <Button onClick={() => navigate('/account/about')}>
+                Edit my profile
+              </Button>
               <ChangePassword />
               <DeleteAccount />
             </Space>

@@ -11,7 +11,7 @@ import {
   ProfileOutlined,
   TeamOutlined,
   EditOutlined,
-  UserOutlined,
+  CheckSquareOutlined,
 } from '@ant-design/icons';
 import { isMobile } from 'react-device-detect';
 
@@ -33,10 +33,10 @@ export default function NavMenu({ vertical = false }) {
             icon: <HomeOutlined />,
           },
           {
-            key: 'account',
-            title: 'My dynamics',
-            label: <Link to='/account'>My dynamics</Link>,
-            icon: <UserOutlined />,
+            key: 'tasks',
+            title: 'Tasks',
+            label: <Link to='/tasks'>Tasks</Link>,
+            icon: <CheckSquareOutlined />,
           },
           {
             key: 'tools',

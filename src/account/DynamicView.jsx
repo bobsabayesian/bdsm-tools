@@ -215,11 +215,20 @@ export default function DynamicView() {
       )}
 
       {(status === 'active' || status === 'paused') && (
-        <Card size='small' style={{ maxWidth: 520, marginBottom: 24 }}>
-          <Typography.Text type='secondary'>
-            Tasks for this dynamic are coming soon.
-          </Typography.Text>
-        </Card>
+        <Button
+          type='primary'
+          style={{ marginBottom: 24 }}
+          onClick={() => {
+            try {
+              localStorage.setItem('tasks-dynamic', JSON.stringify(id));
+            } catch {
+              // the selector will simply start on the first dynamic
+            }
+            navigate('/tasks');
+          }}
+        >
+          Tasks and rules
+        </Button>
       )}
 
       {history.length > 0 && (

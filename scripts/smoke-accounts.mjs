@@ -112,7 +112,10 @@ assert.ok(
 step('setup: body parts are chosen, validated and private');
 assert.equal((await new Person('x').call('GET', '/profile')).status, 401);
 let profile = (await b.call('GET', '/profile')).json;
-assert.deepEqual(profile.steps, [{ id: 'bodyParts', status: null }]);
+assert.deepEqual(profile.steps, [
+  { id: 'bodyParts', status: null },
+  { id: 'equipment', status: null },
+]);
 assert.equal(profile.nextStep, 'bodyParts');
 assert.equal(
   (await b.call('PUT', '/profile/bodyParts', { keys: ['mouth', 'nope'] }))
@@ -148,7 +151,7 @@ assert.deepEqual(profile.selections.bodyParts.map((x) => x.key).sort(), [
   'pussy',
 ]);
 assert.equal(profile.steps[0].status, 'done');
-assert.equal(profile.nextStep, null);
+assert.equal(profile.nextStep, 'equipment', 'equipment comes next');
 await b.call('PUT', '/profile/bodyParts', { keys: ['ass'] });
 assert.deepEqual(
   (await b.call('GET', '/profile')).json.selections.bodyParts.map((x) => x.key),
@@ -168,7 +171,11 @@ assert.equal(
 );
 profile = (await c.call('GET', '/profile')).json;
 assert.equal(profile.steps[0].status, 'skipped');
-assert.equal(profile.nextStep, null, 'a skipped step is not nagged about');
+assert.equal(
+  profile.nextStep,
+  'equipment',
+  'a skipped step is not nagged about - on to the next',
+);
 await c.call('PUT', '/profile/bodyParts', { keys: ['throat'] });
 await c.call('POST', '/profile/steps/bodyParts/skip', {});
 assert.equal(
@@ -176,6 +183,93 @@ assert.equal(
   'done',
   'skipping never undoes a finished step',
 );
+
+step('setup: equipment is chosen the same way');
+const publicEquipment = await (
+  await fetch(`${BASE}/api/catalog/equipment`)
+).json();
+assert.ok(
+  publicEquipment.length >= 20 &&
+    publicEquipment.every((e) => e.value && e.label),
+);
+assert.equal(
+  (await b.call('PUT', '/profile/equipment', { keys: ['rope', 'not-real'] }))
+    .status,
+  400,
+);
+assert.equal(
+  (
+    await b.call('PUT', '/profile/equipment', {
+      choices: [{ key: 'rope', state: 'love' }],
+    })
+  ).status,
+  400,
+  'equipment is just "I have this"',
+);
+assert.equal(
+  (
+    await b.call('PUT', '/profile/equipment', {
+      keys: ['rope', 'blindfold', 'rope'],
+    })
+  ).status,
+  204,
+);
+profile = (await b.call('GET', '/profile')).json;
+assert.deepEqual(profile.selections.equipment.map((x) => x.key).sort(), [
+  'blindfold',
+  'rope',
+]);
+assert.equal(profile.nextStep, null, 'body parts and equipment are done');
+assert.equal(
+  (await c.call('POST', '/profile/steps/equipment/skip', {})).status,
+  204,
+);
+assert.equal((await c.call('GET', '/profile')).json.nextStep, null);
+
+step('the Me tab: optional details, validated, never required');
+profile = (await b.call('GET', '/profile')).json;
+assert.deepEqual(profile.me, { genders: [], pronouns: [], about: '' });
+assert.equal(
+  (await b.call('PUT', '/profile/me', { genders: ['nonsense'] })).status,
+  400,
+  'unknown genders are refused',
+);
+assert.equal(
+  (await b.call('PUT', '/profile/me', { pronouns: 'she/her' })).status,
+  400,
+);
+assert.equal(
+  (await b.call('PUT', '/profile/me', { about: 'x'.repeat(2001) })).status,
+  400,
+);
+assert.equal(
+  (await b.call('PUT', '/profile/me', { pronouns: Array(11).fill('x') }))
+    .status,
+  400,
+);
+assert.equal(
+  (
+    await b.call('PUT', '/profile/me', {
+      pronouns: ['they/them', 'she/her', 'they/them'],
+      about: '  I like a plan.  ',
+    })
+  ).status,
+  204,
+);
+assert.deepEqual((await b.call('GET', '/profile')).json.me, {
+  genders: [],
+  pronouns: ['they/them', 'she/her'],
+  about: 'I like a plan.',
+});
+assert.equal(
+  (await b.call('PUT', '/profile/me', {})).status,
+  204,
+  'everything on this tab can be left blank',
+);
+await b.call('PUT', '/profile/me', {
+  pronouns: ['they/them'],
+  about: 'I like a plan.',
+});
 
 if (process.env.ADMIN_TOKEN) {
   step(
@@ -224,7 +318,7 @@ if (process.env.ADMIN_TOKEN) {
   profile = (await b.call('GET', '/profile')).json;
   assert.deepEqual(
     profile.steps.map((x) => x.id),
-    ['bodyParts', 'kinks'],
+    ['bodyParts', 'equipment', 'kinks'],
   );
   assert.equal(
     profile.nextStep,
@@ -428,6 +522,16 @@ assert.equal(
     .bodyParts[0].key,
   'feet',
   'it is mutual',
+);
+assert.deepEqual(
+  seenByAlice.selections.equipment.map((x) => x.key).sort(),
+  ['blindfold', 'rope'],
+  'equipment is shared too',
+);
+assert.deepEqual(
+  seenByAlice.me,
+  { genders: [], pronouns: ['they/them'], about: 'I like a plan.' },
+  'and so are the Me details',
 );
 assert.equal(
   (await c.call('GET', `/dynamics/${abId}/profile`)).status,

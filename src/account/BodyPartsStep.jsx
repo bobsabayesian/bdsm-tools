@@ -22,26 +22,34 @@ function groupParts(parts) {
  * nobody is asked about their anatomy, sex or gender, and the quick-starts
  * only ever add parts, so they can be mixed freely.
  */
-export default function BodyPartsStep({ onDone }) {
+const sameKeys = (a, b) =>
+  a.size === b.size && [...a].every((key) => b.has(key));
+
+export default function BodyPartsStep({ onDone, embedded = false, onDirty }) {
   const { message } = App.useApp();
   const { items: parts, loading: loadingParts } = useCatalog('bodyParts');
   const { items: presets } = useCatalog('bodyPartPresets');
   const [chosen, setChosen] = React.useState(null);
+  const [saved, setSaved] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
     api
       .getProfile()
-      .then((profile) =>
+      .then((profile) => {
+        const keys = new Set(
+          profile.selections.bodyParts.map(({ key }) => key),
+        );
         // Only the first answer counts: ticks made while this was loading must survive
-        setChosen(
-          (current) =>
-            current ??
-            new Set(profile.selections.bodyParts.map(({ key }) => key)),
-        ),
-      )
+        setChosen((current) => current ?? keys);
+        setSaved(keys);
+      })
       .catch((e) => message.error(errorMessage(e)));
   }, []);
+
+  React.useEffect(() => {
+    if (chosen && saved && onDirty) onDirty(!sameKeys(chosen, saved));
+  }, [chosen, saved]);
 
   if (chosen === null || loadingParts) return <Spin size='large' />;
 
@@ -68,7 +76,10 @@ export default function BodyPartsStep({ onDone }) {
       .then(() => {
         // The training tool on the site reads this cookie
         Cookies.set('body-parts', keys.join('|'), { SameSite: 'Lax' });
-        onDone();
+        setChosen(new Set(keys));
+        setSaved(new Set(keys));
+        if (embedded) message.success('Saved');
+        else onDone();
       })
       .catch((e) => message.error(errorMessage(e)))
       .finally(() => setSaving(false));
@@ -81,7 +92,13 @@ export default function BodyPartsStep({ onDone }) {
 
   return (
     <>
-      <PageHeader title='What would you like included in your tasks?' />
+      {embedded ? (
+        <Typography.Title level={4}>
+          What would you like included in your tasks?
+        </Typography.Title>
+      ) : (
+        <PageHeader title='What would you like included in your tasks?' />
+      )}
       <Space orientation='vertical' size='middle' style={{ maxWidth: 640 }}>
         <Typography.Paragraph>
           Tasks can involve different parts of your body, voice, or personal
@@ -143,7 +160,7 @@ export default function BodyPartsStep({ onDone }) {
           <Button type='primary' loading={saving} onClick={save}>
             Save
           </Button>
-          <Button onClick={skip}>Skip for now</Button>
+          {!embedded && <Button onClick={skip}>Skip for now</Button>}
         </Space>
       </Space>
     </>

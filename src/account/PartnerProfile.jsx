@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, Space, Spin, Table, Tag, Typography } from 'antd';
+import { Card, Space, Spin, Table, Tabs, Tag, Typography } from 'antd';
 import useCatalog from '../hooks/useCatalog';
 import api from '../services/account-api';
 import { LEVELS, LevelTag } from './limits';
@@ -9,6 +9,10 @@ const SIDE_LABEL = { give: 'giving', receive: 'receiving' };
 // Items keep the catalog's order; anything an admin has since switched off is dropped
 const labelled = (catalog, keys) =>
   catalog.filter((item) => keys.includes(item.value));
+
+const Nothing = ({ children }) => (
+  <Typography.Text type='secondary'>{children}</Typography.Text>
+);
 
 function Limits({ kinks, answers }) {
   const withLevel = (level) =>
@@ -26,7 +30,7 @@ function Limits({ kinks, answers }) {
           <div key={level}>
             <LevelTag level={level} />
             {found.length === 0 ? (
-              <Typography.Text type='secondary'>None</Typography.Text>
+              <Nothing>None</Nothing>
             ) : (
               found.map((a) => (
                 <Tag key={`${a.key}/${a.direction}`} color={meta.color}>
@@ -57,14 +61,10 @@ function KinkTable({ kinks, answers }) {
   const categories = [
     ...new Set(rows.map((row) => row.kink.category || 'Other')),
   ];
-  const cell = (level, applies) =>
-    !applies ? (
-      <Typography.Text type='secondary'>n/a</Typography.Text>
-    ) : level ? (
-      <LevelTag level={level} />
-    ) : (
-      <Typography.Text type='secondary'>not decided</Typography.Text>
-    );
+  const cell = (level, applies) => {
+    if (!applies) return <Nothing>n/a</Nothing>;
+    return level ? <LevelTag level={level} /> : <Nothing>not decided</Nothing>;
+  };
 
   return categories.map((category) => (
     <div key={category} style={{ marginTop: 12 }}>
@@ -72,7 +72,6 @@ function KinkTable({ kinks, answers }) {
       <Table
         size='small'
         pagination={false}
-        showHeader
         dataSource={rows.filter(
           (row) => (row.kink.category || 'Other') === category,
         )}
@@ -93,14 +92,17 @@ function KinkTable({ kinks, answers }) {
 }
 
 /**
- * Everything the other person has chosen, in full - body parts and kinks,
- * limits included. Both people in a dynamic see this about each other.
+ * Everything the other person has chosen, in full - the same tabs as their own
+ * "About me", read-only. Limits are always shown first. Both people in a
+ * dynamic see this about each other.
  */
 export default function PartnerProfile({ dynamic }) {
   const { partner } = dynamic;
   const [profile, setProfile] = React.useState(null);
   const { items: bodyParts } = useCatalog('bodyParts');
+  const { items: equipment } = useCatalog('equipment');
   const { items: kinks } = useCatalog('kinks');
+  const { items: genders } = useCatalog('genders');
 
   React.useEffect(() => {
     api
@@ -109,21 +111,18 @@ export default function PartnerProfile({ dynamic }) {
       .catch(() => setProfile({ shared: false }));
   }, [dynamic.id]);
 
-  if (!profile) return <Spin />;
-
+  const cardStyle = { maxWidth: 760, marginBottom: 24 };
+  const title = `About ${partner.alias}`;
   const intro = (
     <Typography.Text type='secondary'>
       {partner.alias} can see the same about you.
     </Typography.Text>
   );
 
+  if (!profile) return <Spin />;
   if (!profile.shared) {
     return (
-      <Card
-        size='small'
-        title={`About ${partner.alias}`}
-        style={{ maxWidth: 760, marginBottom: 24 }}
-      >
+      <Card size='small' title={title} style={cardStyle}>
         <Typography.Paragraph type='secondary'>
           {partner.alias} hasn&rsquo;t filled in their profile yet.
         </Typography.Paragraph>
@@ -132,69 +131,123 @@ export default function PartnerProfile({ dynamic }) {
     );
   }
 
-  const { bodyParts: chosenParts, kinks: kinkAnswers } = profile.selections;
+  const { me, steps, selections } = profile;
   const parts = labelled(
     bodyParts,
-    chosenParts.map((p) => p.key),
+    selections.bodyParts.map((p) => p.key),
   );
   const groups = [...new Set(parts.map((p) => p.group || 'Other'))];
-  const answeredKinks = kinks.filter((k) =>
-    kinkAnswers.some((a) => a.key === k.value),
+  const gear = labelled(
+    equipment,
+    selections.equipment.map((e) => e.key),
   );
-  const status = (step) => profile.steps?.[step];
+  const myGenders = labelled(genders, me.genders);
+  const answeredKinks = kinks.filter((k) =>
+    selections.kinks.some((a) => a.key === k.value),
+  );
+  const nobody = `${partner.alias} hasn’t chosen yet.`;
+
+  const items = [
+    {
+      key: 'me',
+      label: 'Me',
+      children:
+        myGenders.length === 0 && me.pronouns.length === 0 && !me.about ? (
+          <Nothing>{partner.alias} hasn&rsquo;t shared anything here.</Nothing>
+        ) : (
+          <Space orientation='vertical' size='small'>
+            {myGenders.length > 0 && (
+              <div>
+                <Typography.Text type='secondary'>Gender: </Typography.Text>
+                {myGenders.map((g) => (
+                  <Tag key={g.value}>{g.label}</Tag>
+                ))}
+              </div>
+            )}
+            {me.pronouns.length > 0 && (
+              <div>
+                <Typography.Text type='secondary'>Pronouns: </Typography.Text>
+                {me.pronouns.map((p) => (
+                  <Tag key={p}>{p}</Tag>
+                ))}
+              </div>
+            )}
+            {me.about && (
+              <Typography.Paragraph
+                style={{ whiteSpace: 'pre-wrap', margin: 0 }}
+              >
+                {me.about}
+              </Typography.Paragraph>
+            )}
+          </Space>
+        ),
+    },
+    {
+      key: 'body',
+      label: 'Body',
+      children:
+        steps.bodyParts !== 'done' ? (
+          <Nothing>{nobody}</Nothing>
+        ) : parts.length === 0 ? (
+          <Nothing>
+            Nothing &mdash; no body parts are included in tasks.
+          </Nothing>
+        ) : (
+          groups.map((group) => (
+            <div key={group} style={{ marginBottom: 4 }}>
+              <Typography.Text type='secondary'>{group}: </Typography.Text>
+              {parts
+                .filter((p) => (p.group || 'Other') === group)
+                .map((p) => (
+                  <Tag key={p.value}>{p.label}</Tag>
+                ))}
+            </div>
+          ))
+        ),
+    },
+    {
+      key: 'equipment',
+      label: 'Equipment',
+      children:
+        steps.equipment !== 'done' ? (
+          <Nothing>{nobody}</Nothing>
+        ) : gear.length === 0 ? (
+          <Nothing>No equipment.</Nothing>
+        ) : (
+          gear.map((e) => <Tag key={e.value}>{e.label}</Tag>)
+        ),
+    },
+    ...(kinks.length > 0
+      ? [
+          {
+            key: 'kinks',
+            label: 'Kinks',
+            children:
+              steps.kinks !== 'done' ? (
+                <Nothing>
+                  {partner.alias} hasn&rsquo;t answered the kinks yet.
+                </Nothing>
+              ) : answeredKinks.length === 0 ? (
+                <Nothing>No answers.</Nothing>
+              ) : (
+                <KinkTable kinks={answeredKinks} answers={selections.kinks} />
+              ),
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <Card
-      size='small'
-      title={`About ${partner.alias}`}
-      style={{ maxWidth: 760, marginBottom: 24 }}
-    >
+    <Card size='small' title={title} style={cardStyle}>
       <Space orientation='vertical' size='middle' style={{ width: '100%' }}>
         {intro}
-
-        {kinks.length > 0 && (
+        {kinks.length > 0 && steps.kinks === 'done' && (
           <div>
             <Typography.Title level={5}>Limits</Typography.Title>
-            {status('kinks') === 'done' ? (
-              <Limits kinks={kinks} answers={kinkAnswers} />
-            ) : (
-              <Typography.Text type='secondary'>
-                {partner.alias} hasn&rsquo;t answered the kinks yet.
-              </Typography.Text>
-            )}
+            <Limits kinks={kinks} answers={selections.kinks} />
           </div>
         )}
-
-        <div>
-          <Typography.Title level={5}>Included in tasks</Typography.Title>
-          {status('bodyParts') !== 'done' ? (
-            <Typography.Text type='secondary'>
-              {partner.alias} hasn&rsquo;t chosen yet.
-            </Typography.Text>
-          ) : parts.length === 0 ? (
-            <Typography.Text type='secondary'>
-              Nothing &mdash; no body parts are included in tasks.
-            </Typography.Text>
-          ) : (
-            groups.map((group) => (
-              <div key={group} style={{ marginBottom: 4 }}>
-                <Typography.Text type='secondary'>{group}: </Typography.Text>
-                {parts
-                  .filter((p) => (p.group || 'Other') === group)
-                  .map((p) => (
-                    <Tag key={p.value}>{p.label}</Tag>
-                  ))}
-              </div>
-            ))
-          )}
-        </div>
-
-        {status('kinks') === 'done' && answeredKinks.length > 0 && (
-          <div>
-            <Typography.Title level={5}>Kinks</Typography.Title>
-            <KinkTable kinks={answeredKinks} answers={kinkAnswers} />
-          </div>
-        )}
+        <Tabs items={items} />
       </Space>
     </Card>
   );

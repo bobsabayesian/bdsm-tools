@@ -72,6 +72,14 @@ const AccountEntry = React.lazy(
   () => import(/* webpackChunkName: "Account" */ './account/Entry'),
 );
 
+const TasksEntry = React.lazy(
+  () => import(/* webpackChunkName: "Tasks" */ './tasks/Tasks'),
+);
+
+const AboutMeEntry = React.lazy(
+  () => import(/* webpackChunkName: "Account" */ './account/About'),
+);
+
 const SetupEntry = React.lazy(
   () => import(/* webpackChunkName: "Account" */ './account/Setup'),
 );
@@ -107,6 +115,9 @@ export default function Application() {
           <Route index element={<Home />} />
           <Route path='admin' element={<AdminEntry />} />
           <Route path='account' element={<AccountEntry />} />
+          <Route path='tasks' element={<TasksEntry />} />
+          <Route path='account/about' element={<AboutMeEntry />} />
+          <Route path='account/about/:tab' element={<AboutMeEntry />} />
           <Route path='account/setup' element={<SetupEntry />} />
           <Route path='account/setup/:step' element={<SetupEntry />} />
           <Route path='account/dynamics/:id' element={<DynamicView />} />

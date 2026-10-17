@@ -76,14 +76,20 @@ const forProof = (proofs, field) => ({
 
 const catalogs = {
   taskCategories: simpleCatalog('Task categories', 'catalog-task-categories'),
-  genders: simpleCatalog('Genders', 'catalog-genders', [
-    {
-      name: 'pronouns',
-      label: 'Pronouns',
-      type: 'strings',
-      help: 'e.g. "she/her"',
-    },
-  ]),
+  // Offered on the optional "Me" tab - people can also just describe themselves
+  genders: simpleCatalog(
+    'Genders',
+    'catalog-genders',
+    [
+      {
+        name: 'pronouns',
+        label: 'Pronouns',
+        type: 'strings',
+        help: 'e.g. "she/her"',
+      },
+    ],
+    { public: true },
+  ),
   // People rate each kink on the scale in worker/limits.js, separately for
   // giving and receiving (`sides`). A step on the setup screen appears once
   // at least one kink is active.

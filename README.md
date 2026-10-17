@@ -97,17 +97,27 @@ For local testing, `npm run seed:users` (with `npm run dev:api` running) creates
 already in a dynamic together. It refuses to run against anything but localhost. Use separate
 private/incognito windows to be logged in as two people at once.
 
-### Setup choices
+### About me
 
-After signing up, people are asked which body parts they would like **included** in tasks. It is
-deliberately about what someone wants in play, not their anatomy or identity - nobody is asked
-about sex or gender, the quick-start presets only ever add to what is ticked, and skipping is fine.
-Body parts, their groups and the presets are all editable in the admin tool (`worker/catalogs.js`).
-When writing task text, please use neutral wording ("your", "they") rather than gendered pronouns.
+A person's profile lives at **About me** (`/account/about`, linked as "My profile" in the header), with
+one tab each: **Me**, **My Body**, **My Equipment** and **My Kinks**. New people are walked through
+body parts, equipment and kinks once after signing up (`/account/setup`, every step skippable); after
+that About me is where everything is edited. Each tab saves on its own and shows a dot when it has
+unsaved changes. The people in a person's dynamics see exactly the same tabs, read-only, on the
+dynamic's page (`PartnerProfile`).
+
+- **Me** is optional and nothing depends on it: gender (from the admin "Genders" list, if any), pronouns
+  (free text) and "things my partner should know".
+- **My Body** is about what someone wants _included_ in tasks, not their anatomy or identity - nobody
+  is asked about sex or gender, the quick-start presets only ever add to what is ticked, and skipping
+  is fine. Body parts, groups and presets are editable in the admin tool (`worker/catalogs.js`). When
+  writing task text, please use neutral wording ("your", "they") rather than gendered pronouns.
+- **My Equipment** is a plain "I have this" list from the admin Equipment catalog.
+- **My Kinks** appears once at least one kink is active in admin (below).
 
 ### Kinks and limits
 
-Once at least one kink is active in the admin tool, setup gains a second step where people rate
+Once at least one kink is active in the admin tool, the **My Kinks** tab (and a setup step) lets people rate
 each kink, separately for **giving** and **receiving**, on a five-point scale: hard limit, soft
 limit, indifferent, like, love (blank means "not decided"). A kink can be limited to one side with
 its "Ask about" setting.
@@ -135,3 +145,30 @@ kinks, hard and soft limits included (`GET /api/dynamics/:id/profile`, shown on 
 - It stops when a dynamic ends (like "last active"), and ending or deleting an account removes it.
 - Answers given before this was explained (`users.profile_shared_at` is empty) stay hidden until the
   person confirms or saves again, so nothing is exposed retroactively.
+
+### Tasks and rules
+
+The **Tasks** page (left menu, `/tasks`) is one view with a selector at the top right for which dynamic
+you are looking at, and two sections: **Tasks** and **Rules**. What you can do depends on who has
+control in that dynamic: the dominant in a pair, or you in solo mode.
+
+- **Assigning** (control only): pick from the task library - each task shows whether it is possible for
+  this person and why not (a body part or equipment they haven't included, a hard limit, a proof type
+  not yet supported) - or write your own with the same fields and checks. Optional due date or time, and
+  the dom can choose to review it. A task that touches a **soft limit** asks the assigner to attest
+  (Yes/Cancel) first; **hard limits** are refused. Everything is checked on the server
+  (`worker/routes/work.js`, `worker/tasks.js`, `worker/limits.js`). A pair's assignee must have been
+  through profile setup (skipping counts) so they have seen that their partner sees everything.
+- **Doing** a task depends on how it is proven: just doing it, a number, writing, lines, a timer (checked
+  against when the server saw it start), a choice, or a quiz (answers are never sent to the person doing
+  it). Photo/video/audio and location proofs need file storage and location consent and are not
+  available yet. If the dom asked to review, the task waits for approval or is sent back with a note.
+  Not completing a task is just a record ("not done") - nothing is penalised automatically.
+- **Rules** are set by whoever has control. The other person can **comment** but there is nothing to
+  approve. In a pair, making, changing or bringing back a rule asks "Have you discussed this with your
+  partner?" (Yes/Cancel) and records the answer where both can see it. Retiring a rule needs no question.
+- Either person can comment on any rule or task. Everything here is visible only to the two people, and
+  disappears from view once a dynamic ends; while paused it can be read but not changed.
+
+Checks: `ADMIN_TOKEN=... BASE=http://localhost:8787 node scripts/smoke-tasks.mjs` against a fresh local
+database (as for `scripts/smoke-accounts.mjs`).

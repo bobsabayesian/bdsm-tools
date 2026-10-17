@@ -272,10 +272,7 @@ export default function Dynamics() {
           description='You answered these when they were private. In a dynamic everything is open between you, so nothing is shown to anyone until you confirm. Take a look at your choices first if you like.'
           action={
             <Space>
-              <Button
-                size='small'
-                onClick={() => navigate('/account/setup/bodyParts')}
-              >
+              <Button size='small' onClick={() => navigate('/account/about')}>
                 Review
               </Button>
               <Button

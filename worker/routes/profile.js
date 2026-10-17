@@ -14,10 +14,17 @@ import { LEVELS, sidesFor } from '../limits';
  * rated on the scale in limits.js, separately for giving and receiving.
  */
 
+// In the order setup walks through them
 const STEPS = {
   bodyParts: { states: ['yes'], sided: false },
+  equipment: { states: ['yes'], sided: false },
   kinks: { states: LEVELS, sided: true },
 };
+
+// The optional "Me" tab - never part of the setup walk-through, never required
+const MAX_PRONOUNS = 10;
+const MAX_PRONOUN_LENGTH = 40;
+const MAX_ABOUT = 2000;
 const MAX_CHOICES = 600;
 
 export const profile = new Hono();
@@ -51,6 +58,12 @@ const markShared = (db, userId, now) =>
     )
     .bind(now, userId);
 
+export const readAbout = (row) => ({
+  genders: row ? JSON.parse(row.genders) : [],
+  pronouns: row ? JSON.parse(row.pronouns) : [],
+  about: row ? row.about : '',
+});
+
 const readSteps = async (db, userId) => {
   const row = await db
     .prepare('SELECT profile_steps FROM users WHERE id = ?')
@@ -67,7 +80,7 @@ const writeStep = (db, userId, steps, step, status) =>
 profile.get('/', async (c) => {
   const db = c.env.DB;
   const userId = c.get('user').id;
-  const [done, available, { results }] = await Promise.all([
+  const [done, available, { results }, aboutRow] = await Promise.all([
     readSteps(db, userId),
     availableSteps(db),
     db
@@ -76,6 +89,12 @@ profile.get('/', async (c) => {
       )
       .bind(userId)
       .all(),
+    db
+      .prepare(
+        'SELECT genders, pronouns, about FROM user_about WHERE user_id = ?',
+      )
+      .bind(userId)
+      .first(),
   ]);
 
   const { profile_shared_at: sharedAt } = await db
@@ -87,7 +106,11 @@ profile.get('/', async (c) => {
   return c.json({
     steps,
     // Answers given before sharing was explained stay hidden until confirmed
-    sharing: { sharedAt, needsReview: !sharedAt && results.length > 0 },
+    sharing: {
+      sharedAt,
+      needsReview: !sharedAt && (results.length > 0 || !!aboutRow),
+    },
+    me: readAbout(aboutRow),
     nextStep: steps.find((step) => !step.status)?.id ?? null,
     selections: Object.fromEntries(
       Object.keys(STEPS).map((id) => [
@@ -102,6 +125,62 @@ profile.get('/', async (c) => {
       ]),
     ),
   });
+});
+
+// The "Me" tab: { genders: [keys], pronouns: [text], about: text } - all optional
+profile.put('/me', async (c) => {
+  const db = c.env.DB;
+  const userId = c.get('user').id;
+  const body = await c.req.json().catch(() => ({}));
+
+  const genders = body.genders ?? [];
+  const pronouns = body.pronouns ?? [];
+  const about = body.about ?? '';
+  const textList = (list) =>
+    Array.isArray(list) &&
+    list.every((item) => typeof item === 'string' && item.trim().length > 0);
+  if (
+    !textList(genders) ||
+    !textList(pronouns) ||
+    pronouns.length > MAX_PRONOUNS ||
+    pronouns.some((item) => item.length > MAX_PRONOUN_LENGTH) ||
+    typeof about !== 'string' ||
+    about.length > MAX_ABOUT
+  ) {
+    return c.json({ error: 'Invalid details' }, 400);
+  }
+
+  const { results: valid } = await db
+    .prepare(
+      `SELECT json_extract(doc, '$.key') AS key FROM docs
+       WHERE collection = ? AND json_extract(doc, '$.active') = 1`,
+    )
+    .bind(catalogs.genders.collection)
+    .all();
+  const allowed = new Set(valid.map(({ key }) => key));
+  if (genders.some((key) => !allowed.has(key))) {
+    return c.json({ error: 'Some choices are not available' }, 400);
+  }
+
+  const now = new Date().toISOString();
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO user_about (user_id, genders, pronouns, about, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (user_id) DO UPDATE SET genders = excluded.genders,
+           pronouns = excluded.pronouns, about = excluded.about, updated_at = excluded.updated_at`,
+      )
+      .bind(
+        userId,
+        JSON.stringify([...new Set(genders)]),
+        JSON.stringify([...new Set(pronouns.map((item) => item.trim()))]),
+        about.trim(),
+        now,
+      ),
+    markShared(db, userId, now),
+  ]);
+  return c.body(null, 204);
 });
 
 // Replace everything chosen in one catalog:

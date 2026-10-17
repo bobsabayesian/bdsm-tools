@@ -31,29 +31,34 @@ const keyOf = (key, side) => `${key}/${side}`;
  * Setup step: how someone feels about each kink, separately for giving and
  * receiving. Leaving one blank means "not decided", which is fine.
  */
-export default function KinksStep({ onDone }) {
+const normalise = (answers) => JSON.stringify(Object.entries(answers).sort());
+
+export default function KinksStep({ onDone, embedded = false, onDirty }) {
   const { message } = App.useApp();
   const { items: kinks, loading } = useCatalog('kinks');
   const [answers, setAnswers] = React.useState(null); // { 'key/side': level }
+  const [saved, setSaved] = React.useState(null); // the same, as last saved
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
     api
       .getProfile()
-      .then((profile) =>
-        setAnswers(
-          (current) =>
-            current ??
-            Object.fromEntries(
-              profile.selections.kinks.map(({ key, direction, state }) => [
-                keyOf(key, direction),
-                state,
-              ]),
-            ),
-        ),
-      )
+      .then((profile) => {
+        const loaded = Object.fromEntries(
+          profile.selections.kinks.map(({ key, direction, state }) => [
+            keyOf(key, direction),
+            state,
+          ]),
+        );
+        setAnswers((current) => current ?? loaded);
+        setSaved(normalise(loaded));
+      })
       .catch((e) => message.error(errorMessage(e)));
   }, []);
+
+  React.useEffect(() => {
+    if (answers && saved && onDirty) onDirty(normalise(answers) !== saved);
+  }, [answers, saved]);
 
   if (answers === null || loading) return <Spin size='large' />;
 
@@ -79,7 +84,15 @@ export default function KinksStep({ onDone }) {
     );
     api
       .saveChoices('kinks', { choices })
-      .then(onDone)
+      .then(() => {
+        const kept = Object.fromEntries(
+          choices.map((c) => [keyOf(c.key, c.direction), c.state]),
+        );
+        setAnswers(kept);
+        setSaved(normalise(kept));
+        if (embedded) message.success('Saved');
+        else onDone();
+      })
       .catch((e) => message.error(errorMessage(e)))
       .finally(() => setSaving(false));
   };
@@ -91,7 +104,13 @@ export default function KinksStep({ onDone }) {
 
   return (
     <>
-      <PageHeader title='How do you feel about these?' />
+      {embedded ? (
+        <Typography.Title level={4}>
+          How do you feel about these?
+        </Typography.Title>
+      ) : (
+        <PageHeader title='How do you feel about these?' />
+      )}
       <Space orientation='vertical' size='middle' style={{ maxWidth: 760 }}>
         <Typography.Paragraph>
           For each one, say how you feel about <b>giving</b> it and about{' '}
@@ -146,7 +165,7 @@ export default function KinksStep({ onDone }) {
             Save
           </Button>
           <Button onClick={() => setAnswers({})}>Clear all</Button>
-          <Button onClick={skip}>Skip for now</Button>
+          {!embedded && <Button onClick={skip}>Skip for now</Button>}
         </Space>
       </Space>
     </>

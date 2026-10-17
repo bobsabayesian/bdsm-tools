@@ -18,7 +18,9 @@ function AccountStatus() {
   if (!user) return <Link to='/account'>Log in</Link>;
 
   return (
-    <Space>
+    <Space size='middle' wrap>
+      <Link to='/account/about'>My profile</Link>
+      <Link to='/account'>My dynamics</Link>
       <Typography.Text type='secondary'>{user.username}</Typography.Text>
       <Button
         size='small'
