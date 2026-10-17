@@ -16,6 +16,7 @@ import {
   Routes as Routing,
   Route,
   Outlet,
+  useLocation,
   useMatch,
 } from 'react-router-dom';
 import ReactGA from 'react-ga4';
@@ -28,6 +29,8 @@ import UpdateChecker from './UpdateChecker';
 import api from './services/feature-flag-api';
 import ComingSoon from './scene-negotiation/ComingSoon';
 import MobileUserWarning from './components/MobileUserWarning';
+import Landing from './landing/Landing';
+import useAccount from './state/useAccount';
 
 ReactGA.initialize('G-SKBSEEBLCP');
 
@@ -117,6 +120,20 @@ export default function Application() {
 }
 
 function AppLayout() {
+  const { pathname } = useLocation();
+  const { user, loaded, refresh } = useAccount();
+
+  React.useEffect(() => {
+    refresh();
+  }, []);
+
+  // Someone who is not logged in lands on a page of their own, outside the app's frame
+  if (pathname === '/') {
+    if (!loaded)
+      return <div style={{ minHeight: '100vh', background: '#1f1f1f' }} />;
+    if (!user) return <Landing />;
+  }
+
   return (
     <ConfigProvider
       theme={{
@@ -125,10 +142,42 @@ function AppLayout() {
           colorPrimary: '#d71616',
           colorLink: '#d71616',
           colorBgLayout: '#1f1f1f',
+          colorBgContainer: '#262626',
+          colorBorder: '#3a3a3a',
+          colorBorderSecondary: '#2f2f2f',
+          fontFamily:
+            "'Jost', system-ui, -apple-system, 'Segoe UI', sans-serif",
+          fontSize: 15,
+          lineHeight: 1.6,
+          borderRadius: 4,
+          controlHeight: 38,
+          padding: 20,
+          paddingLG: 28,
+          paddingXL: 40,
+          margin: 20,
+          marginLG: 28,
+          marginXL: 40,
+        },
+        components: {
+          Layout: {
+            headerBg: '#1a1a1a',
+            siderBg: '#1a1a1a',
+            headerHeight: 64,
+            headerPadding: '0 24px',
+          },
+          Menu: {
+            itemHeight: 44,
+            itemBg: '#1a1a1a',
+            subMenuItemBg: '#1a1a1a',
+          },
+          Card: { headerFontSize: 16 },
         },
       }}
     >
       <App>
+        <a href='#main-content' className='skip-link'>
+          Skip to content
+        </a>
         <Layout className='fullpage hideoverflow'>
           <Layout.Header className='header'>
             <Header />
@@ -138,7 +187,11 @@ function AppLayout() {
               <Layout.Sider width={250} collapsible collapsed={isMobile}>
                 <NavMenu vertical />
               </Layout.Sider>
-              <Layout.Content className='content'>
+              <Layout.Content
+                className='content'
+                id='main-content'
+                tabIndex={-1}
+              >
                 <React.Suspense fallback={<Spin size='large' />}>
                   <Alert.ErrorBoundary>
                     <Outlet />

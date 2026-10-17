@@ -1,5 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;700&display=swap');
+
 body {
   margin: 0;
+  color-scheme: dark;
+}
+
+// Quick taps, no 300ms wait or double-tap zoom on controls
+button,
+a,
+[role='button'],
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+// Keyboard focus is always visible; mouse clicks don't draw a ring
+:focus-visible {
+  outline: 2px solid #f5f5f5;
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -48px;
+  z-index: 100;
+  padding: 10px 16px;
+  background: #d71616;
+  color: #fff;
+  text-decoration: none;
+
+  &:focus {
+    top: 8px;
+  }
+}
+
+// Fewer and gentler: keep the content, drop the travel
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .header {
@@ -9,8 +55,12 @@ body {
 }
 
 .content {
-  padding: 0 50px;
+  width: 100%;
+  max-width: 70rem;
+  margin: 0 auto;
+  padding: 8px clamp(20px, 4vw, 56px) 96px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .action-buttons {
@@ -111,17 +161,9 @@ div .tool-container {
   padding: 16px 24px !important;
 }
 
-.ant-layout-header {
-  background: #141414;
-}
-
-.ant-layout-sider {
-  background: #141414;
-}
-
 .ant-layout-sider .ant-layout-sider-trigger {
-  background: #141414;
-  border-top: 1px solid #1f1f1f;
+  background: #1a1a1a;
+  border-top: 0;
 }
 
 div[disabled] {

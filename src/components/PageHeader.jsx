@@ -12,7 +12,7 @@ const PageHeader = ({ title, onBack, tags, avatar, style }) => {
         alignItems: 'center',
         gap: '8px',
         height: 64,
-        margin: 'auto',
+        margin: 0,
         ...style,
       }}
     >
@@ -20,6 +20,7 @@ const PageHeader = ({ title, onBack, tags, avatar, style }) => {
         <Button
           type='text'
           icon={<ArrowLeftOutlined />}
+          aria-label='Back'
           onClick={onBack}
           style={{
             display: 'flex',

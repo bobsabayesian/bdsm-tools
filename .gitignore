@@ -10,3 +10,6 @@ gha-creds-*.json
 .dev.vars
 .wrangler/
 scripts/migrate/data.sql
+
+# design-skill working files (screenshots, direction sheet)
+.taste-skill/

@@ -93,7 +93,7 @@ module.exports = {
         ],
       },
       {
-        test: /\.(tif|png|glb|fbx)$/,
+        test: /\.(tif|png|jpe?g|webp|glb|fbx)$/,
         use: [
           {
             loader: 'file-loader',
@@ -163,6 +163,11 @@ module.exports = {
   plugins: [
     new HtmlWebpackPlugin({
       title: 'The Compliance Ledger',
+      meta: {
+        viewport: 'width=device-width, initial-scale=1',
+        'theme-color': '#1f1f1f',
+        'color-scheme': 'dark',
+      },
       favicon: 'favicon.ico',
       base: '/',
     }),

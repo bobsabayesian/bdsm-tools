@@ -24,7 +24,9 @@ export default function NavMenu({ vertical = false }) {
             ? '/'
             : pathname === '/tasks'
               ? ['tasks-all']
-              : pathname.split('/')
+              : pathname.startsWith('/account')
+                ? []
+                : pathname.split('/')
         }
         defaultOpenKeys={['tasks']}
         style={{ minWidth: 0, flex: 'auto' }}

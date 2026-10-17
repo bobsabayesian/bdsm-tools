@@ -1,6 +1,6 @@
 import React from 'react';
 import dayjs from 'dayjs';
-import { Card, Statistic, Typography } from 'antd';
+import { Button, Card, Statistic, Typography } from 'antd';
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -30,9 +30,18 @@ export function Summary({ title, tasks, color, onDo }) {
       />
       {tasks.slice(0, 4).map((a) => (
         <div key={a.id}>
-          <Typography.Link onClick={() => onDo(a)}>
-            {a.task.task}
-          </Typography.Link>{' '}
+          {onDo ? (
+            <Button
+              type='link'
+              size='small'
+              style={{ padding: 0, height: 'auto' }}
+              onClick={() => onDo(a)}
+            >
+              {a.task.task}
+            </Button>
+          ) : (
+            <Typography.Text>{a.task.task}</Typography.Text>
+          )}{' '}
           <Typography.Text type='secondary'>
             {a.dueAt ? dayjs(a.dueAt).format('ddd D MMM, h:mma') : ''}
           </Typography.Text>
