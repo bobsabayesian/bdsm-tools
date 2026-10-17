@@ -1,24 +1,46 @@
 import { Hono } from 'hono';
 import { noStore, requireJson, requireUser } from '../accounts';
 import { catalogs } from '../catalogs';
+import { LEVELS, sidesFor } from '../limits';
 
 /**
  * What a person has chosen to include or avoid. Private to them: nothing here
  * is shown to anyone in their dynamics.
  *
  * Body parts are about what someone wants *included* in tasks - not a
- * statement of anatomy or identity, and nobody is asked for either.
+ * statement of anatomy or identity, and nobody is asked for either. Kinks are
+ * rated on the scale in limits.js, separately for giving and receiving.
  */
 
-// The setup steps, in order. Each is a catalog people choose from, and the
-// states a choice can have. (Kinks will join as yes / maybe / no.)
 const STEPS = {
-  bodyParts: { states: ['yes'] },
+  bodyParts: { states: ['yes'], sided: false },
+  kinks: { states: LEVELS, sided: true },
 };
-const MAX_CHOICES = 300;
+const MAX_CHOICES = 600;
 
 export const profile = new Hono();
 profile.use('*', noStore, requireJson, requireUser);
+
+/** The active items of a step's catalog: { key -> { sides } } */
+const activeItems = async (db, step) => {
+  const { results } = await db
+    .prepare(
+      `SELECT json_extract(doc, '$.key') AS key, json_extract(doc, '$.sides') AS sides
+       FROM docs WHERE collection = ? AND json_extract(doc, '$.active') = 1`,
+    )
+    .bind(catalogs[step].collection)
+    .all();
+  return new Map(results.map(({ key, sides }) => [key, sides]));
+};
+
+// A step only exists while there is something to choose from
+const availableSteps = async (db) => {
+  const available = [];
+  for (const step of Object.keys(STEPS)) {
+    if ((await activeItems(db, step)).size > 0) available.push(step);
+  }
+  return available;
+};
 
 const readSteps = async (db, userId) => {
   const row = await db
@@ -36,20 +58,18 @@ const writeStep = (db, userId, steps, step, status) =>
 profile.get('/', async (c) => {
   const db = c.env.DB;
   const userId = c.get('user').id;
-  const [done, { results }] = await Promise.all([
+  const [done, available, { results }] = await Promise.all([
     readSteps(db, userId),
+    availableSteps(db),
     db
       .prepare(
-        'SELECT catalog, key, state FROM user_selections WHERE user_id = ?',
+        'SELECT catalog, key, direction, state FROM user_selections WHERE user_id = ?',
       )
       .bind(userId)
       .all(),
   ]);
 
-  const steps = Object.keys(STEPS).map((id) => ({
-    id,
-    status: done[id] ?? null,
-  }));
+  const steps = available.map((id) => ({ id, status: done[id] ?? null }));
   return c.json({
     steps,
     nextStep: steps.find((step) => !step.status)?.id ?? null,
@@ -58,63 +78,67 @@ profile.get('/', async (c) => {
         id,
         results
           .filter((row) => row.catalog === id)
-          .map(({ key, state }) => ({ key, state })),
+          .map(({ key, direction, state }) => ({
+            key,
+            state,
+            ...(STEPS[id].sided ? { direction } : {}),
+          })),
       ]),
     ),
   });
 });
 
-// Replace everything chosen in one catalog: { choices: [{ key, state }] }
-// (or { keys: [...] } for catalogs where the only state is 'yes')
+// Replace everything chosen in one catalog:
+//   { choices: [{ key, state, direction? }] }   (or { keys } for body parts)
 profile.put('/:step', async (c) => {
   const db = c.env.DB;
   const userId = c.get('user').id;
   const step = c.req.param('step');
   if (!Object.hasOwn(STEPS, step)) return c.json({ error: 'Not found' }, 404);
 
+  const items = await activeItems(db, step);
+  if (items.size === 0) return c.json({ error: 'Not found' }, 404);
+
+  const { states, sided } = STEPS[step];
   const body = await c.req.json().catch(() => ({}));
   const choices = Array.isArray(body.choices)
     ? body.choices
     : Array.isArray(body.keys)
       ? body.keys.map((key) => ({ key, state: 'yes' }))
       : null;
-  if (
-    !choices ||
-    choices.length > MAX_CHOICES ||
-    choices.some(
-      (choice) =>
-        typeof choice?.key !== 'string' ||
-        !STEPS[step].states.includes(choice.state),
-    )
-  ) {
+  if (!choices || choices.length > MAX_CHOICES) {
     return c.json({ error: 'Invalid choices' }, 400);
   }
 
-  // Only things that exist and are switched on can be chosen
-  const { results: valid } = await db
-    .prepare(
-      `SELECT json_extract(doc, '$.key') AS key FROM docs
-       WHERE collection = ? AND json_extract(doc, '$.active') = 1`,
-    )
-    .bind(catalogs[step].collection)
-    .all();
-  const allowed = new Set(valid.map(({ key }) => key));
-  if (choices.some(({ key }) => !allowed.has(key))) {
-    return c.json({ error: 'Some choices are not available' }, 400);
+  const rows = new Map();
+  for (const choice of choices) {
+    const direction = sided ? choice?.direction : '';
+    const valid =
+      typeof choice?.key === 'string' &&
+      states.includes(choice.state) &&
+      // Only things that exist and are switched on, on a side that makes sense
+      items.has(choice.key) &&
+      (sided ? sidesFor(items.get(choice.key)).includes(direction) : true);
+    if (!valid) return c.json({ error: 'Some choices are not available' }, 400);
+    rows.set(`${choice.key}/${direction}`, {
+      key: choice.key,
+      direction,
+      state: choice.state,
+    });
   }
 
-  const unique = new Map(choices.map(({ key, state }) => [key, state]));
   const now = new Date().toISOString();
   await db.batch([
     db
       .prepare('DELETE FROM user_selections WHERE user_id = ? AND catalog = ?')
       .bind(userId, step),
-    ...[...unique].map(([key, state]) =>
+    ...[...rows.values()].map(({ key, direction, state }) =>
       db
         .prepare(
-          'INSERT INTO user_selections (user_id, catalog, key, state, updated_at) VALUES (?, ?, ?, ?, ?)',
+          `INSERT INTO user_selections (user_id, catalog, key, direction, state, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
         )
-        .bind(userId, step, key, state, now),
+        .bind(userId, step, key, direction, state, now),
     ),
     writeStep(db, userId, await readSteps(db, userId), step, 'done'),
   ]);
@@ -126,7 +150,9 @@ profile.post('/steps/:step/skip', async (c) => {
   const db = c.env.DB;
   const userId = c.get('user').id;
   const step = c.req.param('step');
-  if (!Object.hasOwn(STEPS, step)) return c.json({ error: 'Not found' }, 404);
+  if (!(await availableSteps(db)).includes(step)) {
+    return c.json({ error: 'Not found' }, 404);
+  }
 
   const steps = await readSteps(db, userId);
   if (steps[step] !== 'done')

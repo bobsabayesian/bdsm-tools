@@ -84,31 +84,61 @@ const catalogs = {
       help: 'e.g. "she/her"',
     },
   ]),
-  kinks: simpleCatalog('Kinks', 'catalog-kinks', [
-    { name: 'category', label: 'Category', type: 'string' },
-    {
-      name: 'intensity',
-      label: 'Intensity',
-      type: 'select',
-      options: [
-        { label: 'Mild', value: 'mild' },
-        { label: 'Moderate', value: 'moderate' },
-        { label: 'Intense', value: 'intense' },
-      ],
-    },
-    {
-      name: 'requiresEquipment',
-      label: 'Equipment',
-      type: 'ref',
-      catalog: 'equipment',
-    },
-    {
-      name: 'requiresBodyPart',
-      label: 'Body parts',
-      type: 'ref',
-      catalog: 'bodyParts',
-    },
-  ]),
+  // People rate each kink on the scale in worker/limits.js, separately for
+  // giving and receiving (`sides`). A step on the setup screen appears once
+  // at least one kink is active.
+  kinks: simpleCatalog(
+    'Kinks',
+    'catalog-kinks',
+    [
+      {
+        name: 'order',
+        label: 'Position',
+        type: 'number',
+        help: 'Lower numbers are shown first on the setup screen',
+      },
+      {
+        name: 'category',
+        label: 'Category',
+        type: 'string',
+        help: 'Kinks are listed under their category on the setup screen',
+      },
+      {
+        name: 'sides',
+        label: 'Ask about',
+        type: 'select',
+        default: 'both',
+        options: [
+          { label: 'Giving and receiving', value: 'both' },
+          { label: 'Receiving only', value: 'receive' },
+          { label: 'Giving only', value: 'give' },
+        ],
+      },
+      {
+        name: 'intensity',
+        label: 'Intensity',
+        type: 'select',
+        options: [
+          { label: 'Mild', value: 'mild' },
+          { label: 'Moderate', value: 'moderate' },
+          { label: 'Intense', value: 'intense' },
+        ],
+      },
+      {
+        name: 'requiresEquipment',
+        label: 'Equipment',
+        type: 'ref',
+        catalog: 'equipment',
+      },
+      {
+        name: 'requiresBodyPart',
+        label: 'Body parts',
+        type: 'ref',
+        catalog: 'bodyParts',
+      },
+    ],
+    { public: true },
+  ),
   // `public` catalogs are readable by everyone (active items only) at
   // /api/catalog/:name - the site uses them to build its lists.
   bodyParts: simpleCatalog(
@@ -292,6 +322,22 @@ const catalogs = {
         label: 'Requires equipment',
         type: 'ref',
         catalog: 'equipment',
+      },
+      // From the point of view of the person doing the task. A task is never
+      // given to someone with a hard limit on one of these.
+      {
+        name: 'kinksReceiving',
+        label: 'Kinks they receive',
+        type: 'ref',
+        catalog: 'kinks',
+        help: 'Things done to the person doing this task',
+      },
+      {
+        name: 'kinksGiving',
+        label: 'Kinks they give',
+        type: 'ref',
+        catalog: 'kinks',
+        help: 'Things the person doing this task does to someone else',
       },
     ],
   },

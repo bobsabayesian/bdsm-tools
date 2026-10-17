@@ -105,3 +105,19 @@ about sex or gender, the quick-start presets only ever add to what is ticked, an
 Choices are private to the person (`user_selections`) and are not shown to anyone in their dynamics.
 Body parts, their groups and the presets are all editable in the admin tool (`worker/catalogs.js`).
 When writing task text, please use neutral wording ("your", "they") rather than gendered pronouns.
+
+### Kinks and limits
+
+Once at least one kink is active in the admin tool, setup gains a second step where people rate
+each kink, separately for **giving** and **receiving**, on a five-point scale: hard limit, soft
+limit, indifferent, like, love (blank means "not decided"). A kink can be limited to one side with
+its "Ask about" setting. Choices are private, like body parts.
+
+- **Hard limits** are enforced by the app: a task is never offered to someone with a hard limit on
+  a kink it involves. Tasks list their kinks from the doer's point of view (`kinksReceiving` /
+  `kinksGiving`) and `hardLimitConflicts` in `worker/limits.js` does the check. It is ready for the
+  assignment screens and must never tell an assigner _which_ limit was hit.
+- **Soft limits** are deliberately _not_ a UI choice: the app never blocks on one, flags it as an
+  override, or offers "assign anyway". It is a conversation between the two people. `LimitsNotice`
+  (`src/account/limits.jsx`) says so to both people - on the setup screen now, and with the
+  `task` variant wherever a task is assigned or received.

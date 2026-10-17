@@ -20,7 +20,7 @@ const deleteAccount = (password) => call('delete', '/account', { password });
 
 // Setup choices (body parts, later kinks)
 const getProfile = () => call('get', '/profile');
-const saveChoices = (step, keys) => call('put', `/profile/${step}`, { keys });
+const saveChoices = (step, body) => call('put', `/profile/${step}`, body);
 const skipStep = (step) => call('post', `/profile/steps/${step}/skip`, {});
 
 // Dynamics

@@ -1,6 +1,7 @@
 // End-to-end check of accounts and dynamics against a running Worker:
 //   BASE=http://localhost:8787 node scripts/smoke-accounts.mjs
 // Run it against a fresh local database (sign-ups are rate limited per IP).
+// Set ADMIN_TOKEN as well to include the kink checks (it creates a few kinks).
 import assert from 'node:assert/strict';
 
 const BASE = process.env.BASE ?? 'http://localhost:8787';
@@ -175,6 +176,140 @@ assert.equal(
   'done',
   'skipping never undoes a finished step',
 );
+
+if (process.env.ADMIN_TOKEN) {
+  step(
+    'kinks: the step appears once kinks exist, with sides and a five-point scale',
+  );
+  const admin = (method, path, data) =>
+    fetch(`${BASE}/api/admin${path}`, {
+      method,
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${process.env.ADMIN_TOKEN}`,
+      },
+      body: JSON.stringify(data),
+    });
+  for (const kink of [
+    { key: 'spanking', label: 'Spanking', category: 'Impact', order: 1 },
+    {
+      key: 'blindfolds',
+      label: 'Blindfolds',
+      category: 'Sensation',
+      order: 2,
+      sides: 'receive',
+    },
+    {
+      key: 'service',
+      label: 'Serving',
+      category: 'Protocol',
+      order: 3,
+      sides: 'give',
+    },
+  ])
+    assert.equal(
+      (await admin('POST', '/catalogs/kinks/items', kink)).status,
+      201,
+    );
+
+  const publicKinks = await (await fetch(`${BASE}/api/catalog/kinks`)).json();
+  assert.deepEqual(
+    publicKinks.map((k) => k.value),
+    ['spanking', 'blindfolds', 'service'],
+    'kinks keep their set order',
+  );
+  assert.equal(publicKinks[0].sides, 'both');
+  assert.equal(publicKinks[1].sides, 'receive');
+
+  profile = (await b.call('GET', '/profile')).json;
+  assert.deepEqual(
+    profile.steps.map((x) => x.id),
+    ['bodyParts', 'kinks'],
+  );
+  assert.equal(
+    profile.nextStep,
+    'kinks',
+    'body parts are done, so kinks come next',
+  );
+  assert.equal((await c.call('GET', '/profile')).json.nextStep, 'kinks');
+
+  const put = (choices) => b.call('PUT', '/profile/kinks', { choices });
+  assert.equal(
+    (await put([{ key: 'spanking', state: 'love' }])).status,
+    400,
+    'a side is required',
+  );
+  assert.equal(
+    (await put([{ key: 'spanking', direction: 'receive', state: 'maybe' }]))
+      .status,
+    400,
+    'only the five levels exist',
+  );
+  assert.equal(
+    (await put([{ key: 'blindfolds', direction: 'give', state: 'like' }]))
+      .status,
+    400,
+    'receive-only kinks cannot be given',
+  );
+  assert.equal(
+    (await put([{ key: 'service', direction: 'receive', state: 'like' }]))
+      .status,
+    400,
+    'give-only kinks cannot be received',
+  );
+  assert.equal(
+    (await put([{ key: 'nonsense', direction: 'give', state: 'like' }])).status,
+    400,
+    'unknown kinks are refused',
+  );
+
+  assert.equal(
+    (
+      await put([
+        { key: 'spanking', direction: 'give', state: 'love' },
+        { key: 'spanking', direction: 'receive', state: 'hard-limit' },
+        { key: 'blindfolds', direction: 'receive', state: 'soft-limit' },
+        { key: 'service', direction: 'give', state: 'indifferent' },
+      ])
+    ).status,
+    204,
+  );
+  profile = (await b.call('GET', '/profile')).json;
+  const answers = Object.fromEntries(
+    profile.selections.kinks.map((k) => [`${k.key}/${k.direction}`, k.state]),
+  );
+  assert.deepEqual(answers, {
+    'spanking/give': 'love',
+    'spanking/receive': 'hard-limit',
+    'blindfolds/receive': 'soft-limit',
+    'service/give': 'indifferent',
+  });
+  assert.equal(profile.nextStep, null);
+  assert.deepEqual(
+    profile.selections.bodyParts.map((x) => x.key),
+    [],
+    'body part choices are untouched',
+  );
+
+  await put([{ key: 'spanking', direction: 'give', state: 'like' }]);
+  assert.equal(
+    (await b.call('GET', '/profile')).json.selections.kinks.length,
+    1,
+    'saving replaces earlier answers',
+  );
+
+  assert.equal(
+    (await c.call('POST', '/profile/steps/kinks/skip', {})).status,
+    204,
+  );
+  assert.equal((await c.call('GET', '/profile')).json.nextStep, null);
+  assert.equal(
+    (await c.call('POST', '/profile/steps/nonsense/skip', {})).status,
+    404,
+  );
+} else {
+  console.log('• (skipping kink checks: set ADMIN_TOKEN to run them)');
+}
 
 step('Alice invites, Bob joins');
 const invite = await a.call('POST', '/dynamics/invite', {

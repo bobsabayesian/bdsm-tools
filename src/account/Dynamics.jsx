@@ -260,7 +260,7 @@ export default function Dynamics() {
           showIcon
           style={{ marginBottom: 16 }}
           title='Finish setting up your profile'
-          description='Choose which body parts you would like included in tasks. It takes a minute and you can change it later.'
+          description='Tell us what you would like included in tasks and how you feel about different things. It takes a few minutes and you can change it later.'
           action={
             <Button
               size='small'
