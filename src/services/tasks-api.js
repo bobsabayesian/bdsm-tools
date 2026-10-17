@@ -15,6 +15,14 @@ const assign = (id, body) => call('post', `/${id}/tasks`, body);
 const start = (id, aid) => call('post', `/${id}/tasks/${aid}/start`, {});
 const submit = (id, aid, response) =>
   call('post', `/${id}/tasks/${aid}/submit`, { response });
+// Photo / video / audio: the file goes up on its own, then the task is submitted
+const mediaUrl = (id, aid) => `/api/dynamics/${id}/tasks/${aid}/media`;
+const uploadMedia = (id, aid, file) =>
+  axios
+    .put(mediaUrl(id, aid), file, {
+      headers: { 'Content-Type': file.type, 'X-Upload': '1' },
+    })
+    .then((res) => res.data);
 const review = (id, aid, approve, note) =>
   call('post', `/${id}/tasks/${aid}/review`, { approve, note });
 const cancel = (id, aid) => call('post', `/${id}/tasks/${aid}/cancel`, {});
@@ -33,6 +41,8 @@ const comment = (id, target, body) =>
   call('post', `/${id}/comments`, { target, body });
 
 export default {
+  mediaUrl,
+  uploadMedia,
   list,
   library,
   taskFields,

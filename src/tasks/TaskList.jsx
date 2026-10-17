@@ -100,7 +100,11 @@ function TaskCard({
         {a.response && (a.status === 'done' || a.status === 'submitted') && (
           <div>
             <Typography.Text type='secondary'>Submitted: </Typography.Text>
-            <ResponseSummary task={task} response={a.response} />
+            <ResponseSummary
+              task={task}
+              response={a.response}
+              mediaUrl={api.mediaUrl(dynamicId, a.id)}
+            />
           </div>
         )}
         {a.responseGone && (

@@ -82,14 +82,27 @@ export const visibility = ({
   return 'visible';
 };
 
-/** Deletes submissions past their deletion date. Run daily. */
-export const purgeExpired = (db) =>
-  db
-    .prepare(
-      `UPDATE assignments SET response = NULL
-       WHERE response IS NOT NULL AND submitted_at IS NOT NULL
+const EXPIRED = `response IS NOT NULL AND submitted_at IS NOT NULL
          AND julianday('now') - julianday(submitted_at)
-             > max(?, COALESCE(retention_days, ?))`,
-    )
+             > max(?, COALESCE(retention_days, ?))`;
+
+/** Deletes submissions past their deletion date (and their files). Run daily. */
+export const purgeExpired = async (env) => {
+  const { DB: db, MEDIA: files } = env;
+  if (files) {
+    const { results } = await db
+      .prepare(
+        `SELECT id, dynamic_id FROM assignments
+         WHERE ${EXPIRED} AND json_extract(task, '$.proof') = 'media'`,
+      )
+      .bind(DELETE_FLOOR_DAYS, DEFAULT_DAYS)
+      .all();
+    await Promise.all(
+      results.map((r) => files.delete(`dynamics/${r.dynamic_id}/${r.id}`)),
+    );
+  }
+  return db
+    .prepare(`UPDATE assignments SET response = NULL WHERE ${EXPIRED}`)
     .bind(DELETE_FLOOR_DAYS, DEFAULT_DAYS)
     .run();
+};

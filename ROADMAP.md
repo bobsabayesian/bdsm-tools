@@ -16,7 +16,6 @@ Things we have decided to build but have not yet. (What exists today is describe
 
 - Recurring tasks (due dates and a repeat rule).
 - Role swaps - permanent and time-limited - with both people agreeing.
-- Photo / video / audio and location proof for tasks (needs file storage and location consent).
 - The **Items** and **Spaces** lists for "What's in bounds?" (Items is the old equipment list for now; Spaces is
   empty, so its section stays hidden).
 - Decide what **My Body** should hold now that "What's in bounds?" also covers anatomy.

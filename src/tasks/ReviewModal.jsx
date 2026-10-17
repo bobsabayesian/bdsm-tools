@@ -57,6 +57,7 @@ export default function ReviewModal({
             <ResponseSummary
               task={assignment.task}
               response={assignment.response}
+              mediaUrl={api.mediaUrl(dynamicId, assignment.id)}
             />
           </div>
         </div>

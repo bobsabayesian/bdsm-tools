@@ -18,7 +18,7 @@ export const PROOF_LABEL = {
 export const questionOf = (entry) => String(entry).split('|')[0].trim();
 
 /** What someone submitted, in a line or two, for the list and for review */
-export function ResponseSummary({ task, response }) {
+export function ResponseSummary({ task, response, mediaUrl }) {
   if (!response) return null;
   const proof = task.proof ?? 'attestation';
   switch (proof) {
@@ -49,6 +49,19 @@ export function ResponseSummary({ task, response }) {
       return (
         <Typography.Text>Answered every question correctly</Typography.Text>
       );
+    case 'media': {
+      const { kind } = response.media;
+      const box = { maxWidth: '100%', maxHeight: 360, display: 'block' };
+      return kind === 'photo' ? (
+        <a href={mediaUrl} target='_blank' rel='noreferrer'>
+          <img src={mediaUrl} alt='Submitted' style={box} />
+        </a>
+      ) : kind === 'video' ? (
+        <video src={mediaUrl} controls preload='metadata' style={box} />
+      ) : (
+        <audio src={mediaUrl} controls preload='metadata' />
+      );
+    }
     case 'checkin':
       return (
         <Typography.Text>

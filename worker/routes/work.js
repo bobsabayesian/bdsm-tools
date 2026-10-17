@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { noStore, requireJson, requireUser } from '../accounts';
+import { noStore, requireJsonUnlessUpload, requireUser } from '../accounts';
 import { catalogs, validate } from '../catalogs';
 import { assessAssignment } from '../limits';
 import { overLimit } from '../ratelimit';
@@ -10,6 +10,14 @@ import {
   parseQuiz,
   SUPPORTED_PROOFS,
 } from '../tasks';
+import {
+  acceptedKinds,
+  bareType,
+  kindOf,
+  MEDIA_KINDS,
+  mediaKey,
+  parseRange,
+} from '../media';
 import { daysFor, parsePolicy, visibility } from '../retention';
 import { getDoc, listDocs } from '../docs';
 import { resumeDuePauses } from './dynamics';
@@ -29,7 +37,7 @@ const MAX_RULE_TITLE = 120;
 const MAX_RULE_BODY = 4000;
 
 export const dynamicWork = new Hono();
-dynamicWork.use('*', noStore, requireJson, requireUser);
+dynamicWork.use('*', noStore, requireJsonUnlessUpload, requireUser);
 
 const body = (c) => c.req.json().catch(() => ({}));
 
@@ -423,7 +431,17 @@ dynamicWork.post('/:id/tasks/:aid/submit', async (c) => {
   if (row.status !== 'pending')
     return c.json({ error: 'This task is not waiting to be done' }, 409);
 
-  const result = checkResponse(JSON.parse(row.task), (await body(c)).response, {
+  const task = JSON.parse(row.task);
+  let given = (await body(c)).response;
+  if (task.proof === 'media') {
+    // what was uploaded is what the server holds, whatever the page says
+    const stored = await c.env.MEDIA?.head(mediaKey(m.id, row.id));
+    const contentType = stored?.httpMetadata?.contentType;
+    given = stored
+      ? { media: { kind: kindOf(contentType), contentType, size: stored.size } }
+      : {};
+  }
+  const result = checkResponse(task, given, {
     startedAt: row.started_at ? new Date(row.started_at).getTime() : undefined,
     now: Date.now(),
     dueAt: row.due_at,
@@ -449,6 +467,103 @@ dynamicWork.post('/:id/tasks/:aid/submit', async (c) => {
   );
 });
 
+// ---- Photo, video and audio proofs (stored in R2) ------------------------
+
+const mediaTask = (row) => {
+  const task = JSON.parse(row.task);
+  return task.proof === 'media' ? task : null;
+};
+
+// The person doing the task uploads their file; sending it again replaces it
+dynamicWork.put('/:id/tasks/:aid/media', async (c) => {
+  const { m, res } = await guard(c, { write: true });
+  if (res) return res;
+  if (!c.env.MEDIA)
+    return c.json({ error: 'Uploads are not set up on this site' }, 501);
+  if (c.req.header('x-upload') !== '1')
+    return c.json({ error: 'Not an upload' }, 400);
+  const row = await readAssignment(c, m, c.req.param('aid'));
+  if (!row) return c.json({ error: 'Not found' }, 404);
+  const task = mediaTask(row);
+  if (!task) return c.json({ error: 'This task does not take a file' }, 409);
+  if (row.assigned_to !== m.me.user_id)
+    return forbid(c, 'This task is not yours to do');
+  if (row.status !== 'pending')
+    return c.json({ error: 'This task is not waiting to be done' }, 409);
+
+  const contentType = bareType(c.req.header('content-type'));
+  const kind = kindOf(contentType);
+  if (!kind || !acceptedKinds(task.allowedMedia).includes(kind)) {
+    return c.json(
+      {
+        error: `This task takes a ${task.allowedMedia ?? 'photo'}, and that is not one`,
+      },
+      415,
+    );
+  }
+  const limit = MEDIA_KINDS[kind].maxBytes;
+  const declared = Number(c.req.header('content-length') ?? 0);
+  if (!declared) return c.json({ error: 'Empty file' }, 400);
+  if (declared > limit)
+    return c.json(
+      { error: `That file is too big (most ${limit / 1048576} MB)` },
+      413,
+    );
+  if (await overLimit(c.env.DB, `upload:${m.me.user_id}`, 30, 60 * 60 * 1000))
+    return c.json({ error: 'Too many uploads - try again later' }, 429);
+
+  const data = await c.req.arrayBuffer();
+  if (data.byteLength === 0 || data.byteLength > limit)
+    return c.json({ error: 'That file is not the right size' }, 413);
+  await c.env.MEDIA.put(mediaKey(m.id, row.id), data, {
+    httpMetadata: { contentType },
+  });
+  return c.json({ kind, contentType, size: data.byteLength });
+});
+
+// Either person in the dynamic can look at it - the person with control only
+// while the doer's retention days have not passed
+dynamicWork.get('/:id/tasks/:aid/media', async (c) => {
+  const { m, res } = await guard(c);
+  if (res) return res;
+  const row = await readAssignment(c, m, c.req.param('aid'));
+  if (!row || !mediaTask(row) || !c.env.MEDIA)
+    return c.json({ error: 'Not found' }, 404);
+  const isOwner = row.assigned_to === m.me.user_id;
+  const shown = visibility({
+    submittedAt: row.submitted_at,
+    days: row.retention_days,
+    isOwner,
+  });
+  // the doer can check what they just uploaded; the other person sees it once submitted
+  const submitted = row.response !== null;
+  if (shown !== 'visible' || (!submitted && !isOwner))
+    return c.json({ error: 'Not found' }, 404);
+
+  const key = mediaKey(m.id, row.id);
+  const head = await c.env.MEDIA.head(key);
+  if (!head) return c.json({ error: 'Not found' }, 404);
+  const range = parseRange(c.req.header('range'), head.size);
+  const object = await c.env.MEDIA.get(key, range ? { range } : undefined);
+  if (!object) return c.json({ error: 'Not found' }, 404);
+
+  const headers = {
+    'Content-Type':
+      head.httpMetadata?.contentType ?? 'application/octet-stream',
+    'Content-Length': String(range ? range.length : head.size),
+    'Accept-Ranges': 'bytes',
+    'Cache-Control': 'private, no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; sandbox",
+    'Content-Disposition': 'inline',
+  };
+  if (range) {
+    headers['Content-Range'] =
+      `bytes ${range.offset}-${range.offset + range.length - 1}/${head.size}`;
+  }
+  return new Response(object.body, { status: range ? 206 : 200, headers });
+});
+
 // The person with control looks over what was submitted: approve it, or send it back
 dynamicWork.post('/:id/tasks/:aid/review', async (c) => {
   const { m, res } = await guard(c, { write: true });
@@ -470,6 +585,9 @@ dynamicWork.post('/:id/tasks/:aid/review', async (c) => {
     return c.json({ error: 'That note is too long' }, 400);
   }
   const now = new Date().toISOString();
+  if (!approve && mediaTask(row)) {
+    await c.env.MEDIA?.delete(mediaKey(m.id, row.id));
+  }
   await c.env.DB.prepare(
     approve
       ? `UPDATE assignments SET status = 'done', completed_at = ?, reviewed_at = ?, feedback = ? WHERE id = ?`

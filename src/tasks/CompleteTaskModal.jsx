@@ -8,6 +8,7 @@ import {
   Progress,
   Radio,
   Space,
+  Spin,
   Typography,
 } from 'antd';
 import api, { errorData, errorMessage } from '../services/tasks-api';
@@ -52,12 +53,16 @@ export default function CompleteTaskModal({
   const [wrong, setWrong] = React.useState([]);
   const [saving, setSaving] = React.useState(false);
   const [timeUp, setTimeUp] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const [preview, setPreview] = React.useState(null);
 
   React.useEffect(() => {
     setResponse({});
     setError(null);
     setWrong([]);
     setTimeUp(false);
+    setUploading(false);
+    setPreview(null);
   }, [assignment?.id, open]);
 
   if (!assignment) return null;
@@ -79,6 +84,23 @@ export default function CompleteTaskModal({
       .catch(fail)
       .finally(() => setSaving(false));
   };
+  const upload = (file) => {
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    api
+      .uploadMedia(dynamicId, assignment.id, file)
+      .then((media) => {
+        setResponse({ media });
+        setPreview({ kind: media.kind, url: URL.createObjectURL(file) });
+      })
+      .catch((e) => {
+        setResponse({});
+        setPreview(null);
+        fail(e);
+      })
+      .finally(() => setUploading(false));
+  };
   const start = () =>
     api.start(dynamicId, assignment.id).then(onChanged).catch(fail);
 
@@ -86,6 +108,7 @@ export default function CompleteTaskModal({
   const canSubmit = {
     attestation: true,
     checkin: true,
+    media: !!response.media && !uploading,
     location: typeof response.lat === 'number',
     numeric: typeof response.value === 'number',
     text: !!response.text?.trim(),
@@ -205,6 +228,51 @@ export default function CompleteTaskModal({
               </Button>
             </>
           ))}
+
+        {proof === 'media' && (
+          <>
+            <Typography.Paragraph>
+              Choose a{' '}
+              {{ photo: 'photo', video: 'video', audio: 'recording' }[
+                task.allowedMedia
+              ] ?? 'photo, video or recording'}
+              . Only the person who assigned this can see it
+              {assignment.retentionDays
+                ? `, for ${assignment.retentionDays} ${assignment.retentionDays === 1 ? 'day' : 'days'} (your data retention setting)`
+                : ''}
+              .
+            </Typography.Paragraph>
+            <input
+              type='file'
+              aria-label='File to upload'
+              accept={
+                {
+                  photo: 'image/*',
+                  video: 'video/*',
+                  audio: 'audio/*',
+                }[task.allowedMedia] ?? 'image/*,video/*,audio/*'
+              }
+              disabled={uploading}
+              onChange={(e) => upload(e.target.files?.[0])}
+            />
+            {uploading && <Spin />}
+            {preview?.kind === 'photo' && (
+              <img
+                src={preview.url}
+                alt='Your upload'
+                style={{ maxWidth: '100%', maxHeight: 240 }}
+              />
+            )}
+            {preview?.kind === 'video' && (
+              <video
+                src={preview.url}
+                controls
+                style={{ maxWidth: '100%', maxHeight: 240 }}
+              />
+            )}
+            {preview?.kind === 'audio' && <audio src={preview.url} controls />}
+          </>
+        )}
 
         {proof === 'checkin' && (
           <Typography.Paragraph>

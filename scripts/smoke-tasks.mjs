@@ -27,6 +27,19 @@ class Person {
     const text = await res.text();
     return { status: res.status, json: text ? JSON.parse(text) : null, text };
   }
+  // A file, for photo / video / audio proofs
+  async raw(method, path, body, headers = {}) {
+    const res = await fetch(`${BASE}/api${path}`, {
+      method,
+      headers: { cookie: this.cookie, ...headers },
+      body,
+    });
+    return {
+      status: res.status,
+      headers: res.headers,
+      bytes: Buffer.from(await res.arrayBuffer()),
+    };
+  }
   // A display name is required to be in a dynamic: Zak, Sara and Sam
   async signup(displayName) {
     const r = await this.call('POST', '/account/signup', {
@@ -234,7 +247,7 @@ assert.deepEqual(
   [{ key: 'blindfolds', direction: 'receive' }],
   'soft limits are flagged, not blocked',
 );
-assert.deepEqual(by.Photo.reasons, [{ code: 'proof' }]);
+assert.deepEqual(by.Photo.reasons, [], 'photo tasks can be assigned now');
 
 const fields = (await dom.call('GET', `${P}/task-fields`)).json;
 assert.ok(fields.find((f) => f.name === 'task' && f.required));
@@ -243,6 +256,7 @@ assert.deepEqual(
   fields.find((f) => f.name === 'proof').options.map((o) => o.value),
   [
     'attestation',
+    'media',
     'numeric',
     'text',
     'lines',
@@ -277,7 +291,7 @@ assert.equal(
   201,
 );
 assert.equal((await assign(lib['Needs feet'])).json.code, 'unavailable');
-assert.equal((await assign(lib.Photo)).json.code, 'unavailable');
+assert.equal((await assign(lib.Photo)).status, 201, 'photo tasks can be assigned now');
 const hard = await assign(lib.Spank, {
   attested: [{ key: 'spanking', direction: 'receive' }],
 });
@@ -440,6 +454,112 @@ const shared = await sub.call('POST', `${P}/tasks/${where.json.id}/submit`, {
 });
 assert.equal(shared.json.status, 'done', 'being elsewhere is not refused');
 assert.equal(shared.json.response.withinRadius, false);
+
+step('photo proofs are stored privately and only shown to the pair');
+const photo = await dom.call('POST', `${P}/tasks`, {
+  task: {
+    task: 'Send a photo of your made bed',
+    proof: 'media',
+    allowedMedia: 'photo',
+  },
+  requiresReview: true,
+});
+assert.equal(photo.status, 201);
+const U = `/dynamics/${pair.id}/tasks/${photo.json.id}/media`;
+const png = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
+const asPng = { 'content-type': 'image/png', 'x-upload': '1' };
+assert.equal(
+  (
+    await sub.call('POST', `${P}/tasks/${photo.json.id}/submit`, {
+      response: {},
+    })
+  ).status,
+  422,
+  'nothing uploaded yet',
+);
+assert.equal(
+  (await dom.raw('PUT', U, png, asPng)).status,
+  403,
+  'only the doer uploads',
+);
+assert.equal(
+  (await stranger.raw('PUT', U, png, asPng)).status,
+  404,
+  'not a member',
+);
+assert.equal(
+  (await sub.raw('PUT', U, png, { 'content-type': 'image/png' })).status,
+  400,
+  'needs our header',
+);
+assert.equal(
+  (
+    await sub.raw('PUT', U, png, {
+      'content-type': 'text/html',
+      'x-upload': '1',
+    })
+  ).status,
+  415,
+);
+assert.equal(
+  (
+    await sub.raw('PUT', U, png, {
+      'content-type': 'video/mp4',
+      'x-upload': '1',
+    })
+  ).status,
+  415,
+  'a photo task takes a photo',
+);
+assert.equal(
+  (await sub.raw('PUT', U, Buffer.alloc(11 * 1048576), asPng)).status,
+  413,
+  'too big',
+);
+assert.equal((await sub.raw('PUT', U, png, asPng)).status, 200);
+assert.equal(
+  (await dom.raw('GET', U)).status,
+  404,
+  'the dom sees nothing until it is submitted',
+);
+assert.equal(
+  (await sub.raw('GET', U)).status,
+  200,
+  'the doer can check their own',
+);
+const sent = await sub.call('POST', `${P}/tasks/${photo.json.id}/submit`, {
+  response: { media: { kind: 'video', size: 1 } },
+});
+assert.equal(sent.json.status, 'submitted');
+assert.deepEqual(
+  sent.json.response.media,
+  { kind: 'photo', contentType: 'image/png', size: png.length },
+  'what the server holds, not what the page said',
+);
+const shownToDom = await dom.raw('GET', U);
+assert.equal(shownToDom.status, 200);
+assert.deepEqual(shownToDom.bytes, png);
+assert.equal(shownToDom.headers.get('content-type'), 'image/png');
+assert.equal(shownToDom.headers.get('x-content-type-options'), 'nosniff');
+assert.match(shownToDom.headers.get('content-security-policy'), /sandbox/);
+const part = await dom.raw('GET', U, undefined, { range: 'bytes=0-3' });
+assert.equal(part.status, 206);
+assert.equal(part.bytes.length, 4);
+assert.equal((await stranger.raw('GET', U)).status, 404);
+assert.equal(
+  (await sub.raw('PUT', U, png, asPng)).status,
+  409,
+  'not once submitted',
+);
+await dom.call('POST', `${P}/tasks/${photo.json.id}/review`, {
+  approve: false,
+  note: 'again',
+});
+assert.equal(
+  (await dom.raw('GET', U)).status,
+  404,
+  'sent back: the file is gone',
+);
 
 step("review is the dom's choice: send back, then approve");
 const reviewed = (await assign(lib.Kneel, { requiresReview: true })).json;

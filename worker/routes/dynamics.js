@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { noStore, requireJson, requireUser } from '../accounts';
+import { noStore, requireJsonUnlessUpload, requireUser } from '../accounts';
 import { normalizeCode, randomCode, sha256Hex } from '../passwords';
 import { overLimit } from '../ratelimit';
 import { readAbout } from './profile';
@@ -19,7 +19,7 @@ const REASONS = ['break', 'not-working', 'something-happened', 'not-okay'];
 const MAX_NOTE = 1000;
 
 export const dynamics = new Hono();
-dynamics.use('*', noStore, requireJson, requireUser);
+dynamics.use('*', noStore, requireJsonUnlessUpload, requireUser);
 
 const body = (c) => c.req.json().catch(() => ({}));
 

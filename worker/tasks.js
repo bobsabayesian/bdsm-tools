@@ -2,8 +2,7 @@ import { assessAssignment } from './limits.js';
 
 /**
  * Pure rules about tasks in a dynamic: which can be assigned to whom, and how
- * a response is checked. (Photo/video/audio proofs need file storage, so they
- * are not available yet.)
+ * a response is checked.
  */
 
 export const SUPPORTED_PROOFS = [
@@ -16,6 +15,7 @@ export const SUPPORTED_PROOFS = [
   'quiz',
   'checkin',
   'location',
+  'media',
 ];
 
 const keysOf = (selections, catalog) =>
@@ -189,6 +189,24 @@ export const checkResponse = (
       return {
         ok: true,
         response: { answers: answers.map((a) => String(a).trim()) },
+      };
+    }
+
+    // The file itself is uploaded separately; the server fills in what it holds
+    case 'media': {
+      const media = response.media;
+      if (!media || typeof media.kind !== 'string') {
+        return { ok: false, error: 'Upload your file first' };
+      }
+      return {
+        ok: true,
+        response: {
+          media: {
+            kind: media.kind,
+            contentType: media.contentType,
+            size: media.size,
+          },
+        },
       };
     }
 

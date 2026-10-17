@@ -52,8 +52,8 @@ test('hard limits make a task unavailable; soft limits are flagged but do not', 
   assert.deepEqual(soft.softLimits, [{ key: 'rope', direction: 'receive' }]);
 });
 
-test('photo, video and audio tasks cannot be assigned yet', () => {
-  assert.equal(availability({ proof: 'media' }, []).assignable, false);
+test('every kind of proof can be assigned', () => {
+  assert.equal(availability({ proof: 'media' }, []).assignable, true);
   assert.equal(availability({ proof: 'location' }, []).assignable, true);
   assert.equal(availability({ proof: 'checkin' }, []).assignable, true);
   assert.equal(availability({ proof: 'timer' }, []).assignable, true);
@@ -235,4 +235,16 @@ test('check-ins note lateness and locations note distance, and neither is refuse
     undefined,
     'no place given: just where they are',
   );
+});
+
+test('a media response is whatever the server found uploaded', () => {
+  const task = { proof: 'media' };
+  assert.equal(checkResponse(task, {}).ok, false, 'no file yet');
+  const done = checkResponse(task, {
+    media: { kind: 'photo', contentType: 'image/png', size: 5, extra: 'x' },
+  });
+  assert.equal(done.ok, true);
+  assert.deepEqual(done.response, {
+    media: { kind: 'photo', contentType: 'image/png', size: 5 },
+  });
 });

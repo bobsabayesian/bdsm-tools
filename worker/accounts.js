@@ -92,6 +92,16 @@ export const requireJson = async (c, next) => {
   await next();
 };
 
+/**
+ * Like requireJson, except for file uploads (PUT .../media), which carry a
+ * media content type and an X-Upload header instead (checked where they are
+ * handled). A page on another site can send neither without our permission.
+ */
+export const requireJsonUnlessUpload = (c, next) =>
+  c.req.method === 'PUT' && c.req.path.endsWith('/media')
+    ? next()
+    : requireJson(c, next);
+
 export const noStore = async (c, next) => {
   await next();
   c.header('Cache-Control', 'no-store');

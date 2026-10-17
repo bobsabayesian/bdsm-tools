@@ -6,6 +6,7 @@ import { dynamics } from './routes/dynamics';
 import { dynamicWork } from './routes/work';
 import { featureFlags } from './routes/feature-flags';
 import { profile } from './routes/profile';
+import { sweepMedia } from './media';
 import { purgeExpired } from './retention';
 import { sceneNegotiation } from './routes/scene-negotiation';
 
@@ -33,6 +34,6 @@ export default {
   fetch: app.fetch,
   // daily: remove submissions that are past their retention days
   scheduled: (event, env, ctx) => {
-    ctx.waitUntil(purgeExpired(env.DB));
+    ctx.waitUntil(purgeExpired(env).then(() => sweepMedia(env)));
   },
 };

@@ -26,6 +26,15 @@
 			"database_id": "bcc66e40-7838-46fa-9e63-0742768c53e1"
 		},
 	],
+	// Photo / video / audio proofs. Create once with:
+	//   npx wrangler r2 bucket create bdsm-tools-media
+	// (local development simulates it - nothing to create)
+	"r2_buckets": [
+		{
+			"binding": "MEDIA",
+			"bucket_name": "bdsm-tools-media"
+		}
+	],
 	// Daily clean-up of submissions past their retention days
 	"triggers": {
 		"crons": ["17 3 * * *"]

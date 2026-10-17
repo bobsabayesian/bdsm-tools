@@ -35,6 +35,7 @@ One-time setup:
 ```bash
 $ npx wrangler login
 $ npx wrangler d1 create bdsm-tools    # paste the database_id into wrangler.jsonc
+$ npx wrangler r2 bucket create bdsm-tools-media   # photo / video / audio proofs
 $ npm run db:migrate
 $ npm run deploy                       # first deploy creates the Worker
 $ npx wrangler secret put ADMIN_TOKEN
